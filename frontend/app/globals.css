@@ -1,0 +1,234 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Inter, system-ui, sans-serif;
+}
+
+/*
+ * Role theme tokens.
+ *
+ * The public site and authentication pages use the default :root values
+ * (the main school brand blue). Inside the dashboard layout the active
+ * role is applied via the `data-role` attribute, which shifts only the
+ * accent palette used by shared dashboard components (sidebar, header,
+ * stat cards, card highlights, background tint). All roles stay within
+ * the same blue -> teal/green brand family so the product looks unified.
+ */
+:root {
+  --role-50: 239 246 255;
+  --role-100: 219 234 254;
+  --role-200: 191 219 254;
+  --role-300: 147 197 253;
+  --role-400: 96 165 250;
+  --role-500: 59 130 246;
+  --role-600: 37 99 235;
+  --role-700: 29 78 216;
+  --role-800: 30 64 175;
+  --role-900: 30 58 138;
+}
+
+/* Super Admin: deeper, authoritative navy blue */
+[data-role="super_admin"] {
+  --role-50: 244 246 253;
+  --role-100: 231 235 250;
+  --role-200: 200 210 242;
+  --role-300: 159 178 231;
+  --role-400: 100 126 213;
+  --role-500: 59 84 194;
+  --role-600: 39 58 158;
+  --role-700: 31 46 127;
+  --role-800: 25 37 101;
+  --role-900: 19 28 78;
+}
+
+/* Admin: professional brand blue (inherits default :root) */
+
+/* Management: calm blue/teal */
+[data-role="management"] {
+  --role-50: 239 251 250;
+  --role-100: 221 245 244;
+  --role-200: 179 233 232;
+  --role-300: 129 216 216;
+  --role-400: 78 190 191;
+  --role-500: 45 164 167;
+  --role-600: 29 133 136;
+  --role-700: 25 107 110;
+  --role-800: 21 87 89;
+  --role-900: 17 69 71;
+}
+
+/* Teacher: soft green/teal */
+[data-role="teacher"] {
+  --role-50: 240 250 248;
+  --role-100: 221 243 239;
+  --role-200: 185 229 222;
+  --role-300: 140 210 199;
+  --role-400: 92 185 171;
+  --role-500: 55 160 145;
+  --role-600: 39 128 115;
+  --role-700: 33 105 94;
+  --role-800: 28 85 77;
+  --role-900: 23 68 62;
+}
+
+/* Student: lighter, more energetic blue */
+[data-role="student"] {
+  --role-50: 240 248 255;
+  --role-100: 224 242 255;
+  --role-200: 186 230 254;
+  --role-300: 134 211 250;
+  --role-400: 79 184 244;
+  --role-500: 47 158 235;
+  --role-600: 27 127 210;
+  --role-700: 24 101 171;
+  --role-800: 23 81 138;
+  --role-900: 20 65 111;
+}
+
+/*
+ * Soft role-tinted gradient applied to the dashboard background.
+ * Scoped to [data-role] so the public site keeps its neutral background.
+ */
+[data-role].role-bg-gradient {
+  background-image: linear-gradient(
+    180deg,
+    rgb(var(--role-50) / 0.55) 0%,
+    rgb(var(--role-50) / 0.18) 180px,
+    rgb(249 250 251 / 0) 420px
+  );
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-all duration-200 hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 hover:shadow-sm active:scale-[0.98];
+  }
+  .btn-danger {
+    @apply bg-danger-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-danger-600 transition-all duration-200 hover:shadow-md active:scale-[0.98];
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -6px rgb(0 0 0 / 0.12);
+  }
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-success {
+    @apply bg-green-100 text-green-800;
+  }
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  .badge-danger {
+    @apply bg-red-100 text-red-800;
+  }
+  .badge-info {
+    @apply bg-blue-100 text-blue-800;
+  }
+}
+
+/* Card top accent line, tinted by the active role (dashboard only). */
+[data-role] .card {
+  position: relative;
+}
+[data-role] .card::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  height: 3px;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: linear-gradient(90deg, rgb(var(--role-500) / 0.9), rgb(var(--role-300) / 0.4));
+}
+
+/* Subtle role-tinted hover for dashboard table rows. */
+[data-role] tbody tr {
+  transition: background-color 0.15s ease;
+}
+[data-role] tbody tr:hover {
+  background-color: rgb(var(--role-50) / 0.6);
+}
+
+/* Gentle image zoom on hover inside overflow-hidden cards. */
+.card.overflow-hidden img {
+  transition: transform 0.4s ease;
+}
+.card.overflow-hidden:hover img {
+  transform: scale(1.03);
+}
+
+/*
+ * Dashboard entrance animation with a small stagger.
+ * `backwards` fill hides cards during their delay but lets the natural
+ * styles (including hover transforms) apply once the animation finishes.
+ */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+[data-role] .card {
+  animation: fade-in-up 0.5s ease-out backwards;
+}
+[data-role] .card:nth-child(2) {
+  animation-delay: 0.05s;
+}
+[data-role] .card:nth-child(3) {
+  animation-delay: 0.1s;
+}
+[data-role] .card:nth-child(4) {
+  animation-delay: 0.15s;
+}
+[data-role] .card:nth-child(5) {
+  animation-delay: 0.2s;
+}
+[data-role] .card:nth-child(6) {
+  animation-delay: 0.25s;
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  [data-role] .card {
+    animation: none !important;
+  }
+  .card:hover {
+    transform: none !important;
+  }
+  .card.overflow-hidden:hover img {
+    transform: none !important;
+  }
+  .btn-primary:active,
+  .btn-secondary:active,
+  .btn-danger:active {
+    transform: none !important;
+  }
+}

@@ -1,0 +1,20 @@
+from app.routers.auth import auth
+from app.routers.school import router as school_router
+from app.routers.class_router import router as class_router
+from app.routers.student import router as student_router
+from app.routers.teacher import router as teacher_router
+from app.routers.subject import router as subject_router
+from app.routers.curriculum import router as curriculum_router
+from app.routers.attendance import router as attendance_router
+from app.routers.grade import router as grade_router
+from app.routers.exam import router as exam_router
+from app.routers.assignment import router as assignment_router
+from app.routers.announcement import router as announcement_router
+from app.routers.fee import router as fee_router
+from app.routers.leave_request import router as leave_request_router
+from app.routers.schedule import router as schedule_router
+from app.routers.academic_calendar import router as academic_calendar_router
+from app.routers.notification import router as notification_router
+from app.routers.documents import router as document_router
+from app.routers.users import router as user_router
+from app.routers.audit_logs import router as audit_log_router
