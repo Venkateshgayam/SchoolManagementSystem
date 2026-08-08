@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getLoginPath } from "@/lib/auth";
 
 const apiClient = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`,
@@ -43,8 +44,16 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError);
+        // Capture role BEFORE clearing auth state so we can redirect to the correct login page.
+        let role: string | null = null;
+        try {
+          const raw = localStorage.getItem("user");
+          if (raw) role = JSON.parse(raw).role;
+        } catch {
+          role = null;
+        }
         localStorage.removeItem("user");
-        window.location.href = "/login";
+        window.location.href = getLoginPath(role);
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

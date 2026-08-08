@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { X, LayoutDashboard, Users, BookOpen, ClipboardList, Bell, LogOut, Key, UserCheck, BarChart3, FileText, Award, User } from "lucide-react";
+import { X, LayoutDashboard, Users, BookOpen, ClipboardList, Bell, LogOut, Key, UserCheck, BarChart3, FileText, Award, User, Wallet, TrendingUp, Megaphone } from "lucide-react";
 import { api } from "@/lib/api";
+import { getUser, getLoginPath } from "@/lib/auth";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -13,63 +14,64 @@ interface SidebarProps {
 
 const menuItems: Record<string, Array<{ href: string; label: string; icon: any }>> = {
   student: [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/profile", label: "My Profile", icon: User },
-    { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardList },
-    { href: "/dashboard/grades", label: "Grades", icon: BookOpen },
-    { href: "/dashboard/exams", label: "Examinations", icon: Award },
-    { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardList },
-    { href: "/dashboard/subjects", label: "Subjects", icon: BookOpen },
-    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+    { href: "/dashboard/student", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/student/profile", label: "My Profile", icon: User },
+    { href: "/dashboard/student/attendance", label: "Attendance", icon: ClipboardList },
+    { href: "/dashboard/student/grades", label: "Grades", icon: BarChart3 },
+    { href: "/dashboard/student/exams", label: "Examinations", icon: Award },
+    { href: "/dashboard/student/assignments", label: "Assignments", icon: FileText },
+    { href: "/dashboard/student/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/dashboard/student/notifications", label: "Notifications", icon: Bell },
   ],
   teacher: [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/classes", label: "My Classes", icon: BookOpen },
-    { href: "/dashboard/students", label: "My Students", icon: UserCheck },
-    { href: "/dashboard/subjects", label: "Subjects", icon: BookOpen },
-    { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardList },
-    { href: "/dashboard/grades", label: "Grades", icon: BarChart3 },
-    { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardList },
-    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+    { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/profile", label: "My Profile", icon: User },
+    { href: "/dashboard/teacher/classes", label: "My Classes", icon: BookOpen },
+    { href: "/dashboard/teacher/students", label: "My Students", icon: UserCheck },
+    { href: "/dashboard/teacher/attendance", label: "Attendance", icon: ClipboardList },
+    { href: "/dashboard/teacher/assignments", label: "Assignments", icon: FileText },
+    { href: "/dashboard/teacher/grades", label: "Grades", icon: BarChart3 },
+    { href: "/dashboard/teacher/schedule", label: "Schedule", icon: ClipboardList },
+    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
   ],
   management: [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/students", label: "Students", icon: Users },
-    { href: "/dashboard/teachers", label: "Teachers", icon: UserCheck },
-    { href: "/dashboard/classes", label: "Classes", icon: BookOpen },
-    { href: "/dashboard/subjects", label: "Subjects", icon: BookOpen },
-    { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardList },
-    { href: "/dashboard/grades", label: "Grades", icon: BarChart3 },
-    { href: "/dashboard/exams", label: "Examinations", icon: Award },
-    { href: "/dashboard/assignments", label: "Assignments", icon: FileText },
-    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+    { href: "/dashboard/management", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/management/students", label: "Students", icon: Users },
+    { href: "/dashboard/management/teachers", label: "Teachers", icon: UserCheck },
+    { href: "/dashboard/management/classes", label: "Classes", icon: BookOpen },
+    { href: "/dashboard/management/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/dashboard/management/attendance", label: "Attendance", icon: ClipboardList },
+    { href: "/dashboard/management/examinations", label: "Examinations", icon: Award },
+    { href: "/dashboard/management/fees", label: "Fees", icon: Wallet },
+    { href: "/dashboard/management/reports", label: "Reports", icon: TrendingUp },
+    { href: "/dashboard/management/announcements", label: "Announcements", icon: Megaphone },
+    { href: "/dashboard/management/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/profile", label: "My Profile", icon: User },
   ],
   admin: [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/students", label: "Students", icon: Users },
-    { href: "/dashboard/teachers", label: "Teachers", icon: UserCheck },
-    { href: "/dashboard/classes", label: "Classes", icon: BookOpen },
-    { href: "/dashboard/subjects", label: "Subjects", icon: BookOpen },
-    { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardList },
-    { href: "/dashboard/grades", label: "Grades", icon: BarChart3 },
-    { href: "/dashboard/exams", label: "Examinations", icon: Award },
-    { href: "/dashboard/assignments", label: "Assignments", icon: FileText },
-    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+    { href: "/dashboard/admin", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/admin/students", label: "Students", icon: Users },
+    { href: "/dashboard/admin/teachers", label: "Teachers", icon: UserCheck },
+    { href: "/dashboard/admin/classes", label: "Classes", icon: BookOpen },
+    { href: "/dashboard/admin/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/dashboard/admin/attendance", label: "Attendance", icon: ClipboardList },
+    { href: "/dashboard/admin/grades", label: "Grades", icon: BarChart3 },
+    { href: "/dashboard/admin/exams", label: "Examinations", icon: Award },
+    { href: "/dashboard/admin/assignments", label: "Assignments", icon: FileText },
+    { href: "/dashboard/admin/fees", label: "Fees", icon: Wallet },
+    { href: "/dashboard/admin/reports", label: "Reports", icon: TrendingUp },
+    { href: "/dashboard/admin/announcements", label: "Announcements", icon: Megaphone },
+    { href: "/dashboard/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/profile", label: "My Profile", icon: User },
   ],
   super_admin: [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/students", label: "Students", icon: Users },
-    { href: "/dashboard/teachers", label: "Teachers", icon: UserCheck },
-    { href: "/dashboard/classes", label: "Classes", icon: BookOpen },
-    { href: "/dashboard/subjects", label: "Subjects", icon: BookOpen },
-    { href: "/dashboard/attendance", label: "Attendance", icon: ClipboardList },
-    { href: "/dashboard/grades", label: "Grades", icon: BarChart3 },
-    { href: "/dashboard/exams", label: "Examinations", icon: Award },
-    { href: "/dashboard/assignments", label: "Assignments", icon: FileText },
-    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+    { href: "/dashboard/super-admin", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/super-admin/schools", label: "Schools", icon: Users },
+    { href: "/dashboard/super-admin/users", label: "Users", icon: UserCheck },
+    { href: "/dashboard/super-admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
+    { href: "/dashboard/super-admin/reports", label: "Reports", icon: TrendingUp },
+    { href: "/dashboard/super-admin/settings", label: "Settings", icon: Key },
+    { href: "/dashboard/super-admin/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/profile", label: "My Profile", icon: User },
   ],
 };
@@ -79,25 +81,24 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    let parsed: { role?: string } | null = null;
-    try {
-      parsed = JSON.parse(localStorage.getItem("user") || "null");
-    } catch {
-      parsed = null;
-    }
-    setRole(parsed?.role || "student");
+    const parsedUser = getUser();
+    setRole(parsedUser?.role || "student");
   }, [pathname]);
 
   const items = role ? menuItems[role as keyof typeof menuItems] || menuItems.student : [];
 
   const handleLogout = async () => {
+    // Capture role from localStorage BEFORE clearing auth state so we can
+    // redirect to the correct role-specific login page.
+    const currentUser = getUser();
+    const currentRole = currentUser?.role;
     try {
       await api.post("/auth/logout");
     } catch {
       // ignore
     }
     localStorage.removeItem("user");
-    window.location.href = "/login";
+    window.location.href = getLoginPath(currentRole);
   };
 
   return (

@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { Menu, Bell, User, LogOut, ChevronDown, X, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { getUser, getLoginPath } from "@/lib/auth";
 
 const menuSections = [
   {
@@ -60,6 +60,14 @@ const menuSections = [
       { href: "/events", label: "Events" },
     ],
   },
+  {
+    title: "PORTALS / LOGIN",
+    links: [
+      { href: "/login/student", label: "Student" },
+      { href: "/login/teacher", label: "Teacher" },
+      { href: "/login/management", label: "Management" },
+    ],
+  },
 ];
 
 export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -77,7 +85,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const isDashboard = !!onMenuClick;
 
-  const authPaths = ["/login"];
+  const authPaths = ["/login", "/admin/login", "/super-admin/login"];
   const isAuthPage = pathname
     ? authPaths.some((p) => pathname === p || pathname.startsWith(p + "/"))
     : false;
@@ -120,13 +128,17 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   }, [user, pathname]);
 
   const handleLogout = async () => {
+    // Capture role from localStorage BEFORE clearing auth state so we can
+    // redirect to the correct role-specific login page.
+    const currentUser = getUser();
+    const role = currentUser?.role;
     try {
       await api.post("/auth/logout");
     } catch {
       // ignore
     }
     localStorage.removeItem("user");
-    window.location.href = "/login";
+    window.location.href = getLoginPath(role);
   };
 
   const toggleSection = (title: string) => {

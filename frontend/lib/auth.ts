@@ -31,12 +31,38 @@ export function slugToRole(slug: string | null | undefined): string | null {
   return entry ? entry[0] : null;
 }
 
-export function getDashboardPath(_role?: string | null): string {
-  return "/dashboard";
+export function getDashboardPath(role?: string | null): string {
+  switch (role) {
+    case "student":
+      return "/dashboard/student";
+    case "teacher":
+      return "/dashboard/teacher";
+    case "management":
+      return "/dashboard/management";
+    case "admin":
+      return "/dashboard/admin";
+    case "super_admin":
+      return "/dashboard/super-admin";
+    default:
+      return "/dashboard";
+  }
 }
 
-export function getLoginPath(_role?: string | null): string {
-  return "/login";
+export function getLoginPath(role?: string | null): string {
+  switch (role) {
+    case "student":
+      return "/login/student";
+    case "teacher":
+      return "/login/teacher";
+    case "management":
+      return "/login/management";
+    case "admin":
+      return "/admin/login";
+    case "super_admin":
+      return "/super-admin/login";
+    default:
+      return "/login";
+  }
 }
 
 export function getRoleTitle(role?: string | null): string {
@@ -57,6 +83,10 @@ export function getRoleTitle(role?: string | null): string {
 }
 
 export function logout(): void {
+  // Capture the role BEFORE clearing auth state so we can redirect to the
+  // correct role-specific login page.
+  const user = getUser();
+  const role = user?.role;
   localStorage.removeItem("user");
-  window.location.href = "/login";
+  window.location.href = getLoginPath(role);
 }

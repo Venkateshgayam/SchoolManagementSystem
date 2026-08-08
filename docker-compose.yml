@@ -1,24 +1,21 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: sms_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: school_management
-      POSTGRES_USER: sms_user
-      POSTGRES_PASSWORD: sms_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sms_user -d school_management"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
-
   backend:
     build:
       context: ./backend
@@ -26,12 +23,12 @@ services:
     container_name: sms_backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://sms_user:sms_password@postgres:5432/school_management
-      JWT_SECRET_KEY: change-me-in-production-super-secret-key
-      JWT_ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
-      REFRESH_TOKEN_EXPIRE_DAYS: 7
-      ENVIRONMENT: development
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+      ENVIRONMENT: ${ENVIRONMENT}
     ports:
       - "8000:8000"
     depends_on:
@@ -40,7 +37,6 @@ services:
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
   frontend:
     build:
       context: ./frontend
@@ -48,7 +44,7 @@ services:
     container_name: sms_frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
       - "3000:3000"
     depends_on:

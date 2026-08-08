@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUser } from "@/lib/auth";
+import { getUser, getDashboardPath } from "@/lib/auth";
 
 export type AuthGateState = "checking" | "guest" | "authenticated";
 
@@ -15,7 +15,7 @@ export function useAuthGate(): AuthGateState {
     const role = user?.role;
     if (role && knownRoles.includes(role)) {
       setState("authenticated");
-      router.replace("/dashboard");
+      router.replace(getDashboardPath(role));
     } else {
       setState("guest");
     }
