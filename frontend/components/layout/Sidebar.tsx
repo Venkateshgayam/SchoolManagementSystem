@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { X, LayoutDashboard, Users, BookOpen, ClipboardList, Bell, LogOut, Key, UserCheck, BarChart3, FileText, Award, User, Wallet, TrendingUp, Megaphone } from "lucide-react";
+import { X, LayoutDashboard, Users, BookOpen, ClipboardList, Bell, LogOut, Key, UserCheck, BarChart3, FileText, Award, User, Wallet, TrendingUp, Megaphone, CalendarDays } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, getLoginPath } from "@/lib/auth";
 
@@ -21,6 +21,7 @@ const menuItems: Record<string, Array<{ href: string; label: string; icon: any }
     { href: "/dashboard/student/exams", label: "Examinations", icon: Award },
     { href: "/dashboard/student/assignments", label: "Assignments", icon: FileText },
     { href: "/dashboard/student/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/dashboard/student/leave-requests", label: "Leave Requests", icon: CalendarDays },
     { href: "/dashboard/student/notifications", label: "Notifications", icon: Bell },
   ],
   teacher: [
@@ -30,8 +31,10 @@ const menuItems: Record<string, Array<{ href: string; label: string; icon: any }
     { href: "/dashboard/teacher/students", label: "My Students", icon: UserCheck },
     { href: "/dashboard/teacher/attendance", label: "Attendance", icon: ClipboardList },
     { href: "/dashboard/teacher/assignments", label: "Assignments", icon: FileText },
+    { href: "/dashboard/teacher/exams", label: "Examinations", icon: Award },
     { href: "/dashboard/teacher/grades", label: "Grades", icon: BarChart3 },
     { href: "/dashboard/teacher/schedule", label: "Schedule", icon: ClipboardList },
+    { href: "/dashboard/teacher/leave-requests", label: "Leave Requests", icon: CalendarDays },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
   ],
   management: [
@@ -43,6 +46,7 @@ const menuItems: Record<string, Array<{ href: string; label: string; icon: any }
     { href: "/dashboard/management/attendance", label: "Attendance", icon: ClipboardList },
     { href: "/dashboard/management/examinations", label: "Examinations", icon: Award },
     { href: "/dashboard/management/fees", label: "Fees", icon: Wallet },
+    { href: "/dashboard/management/leave-requests", label: "Leave Requests", icon: CalendarDays },
     { href: "/dashboard/management/reports", label: "Reports", icon: TrendingUp },
     { href: "/dashboard/management/announcements", label: "Announcements", icon: Megaphone },
     { href: "/dashboard/management/notifications", label: "Notifications", icon: Bell },
@@ -59,6 +63,7 @@ const menuItems: Record<string, Array<{ href: string; label: string; icon: any }
     { href: "/dashboard/admin/exams", label: "Examinations", icon: Award },
     { href: "/dashboard/admin/assignments", label: "Assignments", icon: FileText },
     { href: "/dashboard/admin/fees", label: "Fees", icon: Wallet },
+    { href: "/dashboard/admin/leave-requests", label: "Leave Requests", icon: CalendarDays },
     { href: "/dashboard/admin/reports", label: "Reports", icon: TrendingUp },
     { href: "/dashboard/admin/announcements", label: "Announcements", icon: Megaphone },
     { href: "/dashboard/admin/notifications", label: "Notifications", icon: Bell },
@@ -146,7 +151,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           })}
           <hr className="my-4 border-gray-200" />
           <Link
-            href="/change-password"
+            href="/dashboard/change-password"
             className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-lg transition-all duration-150 hover:bg-role-50/50 hover:text-role-800"
           >
             <Key className="mr-3 h-5 w-5" />

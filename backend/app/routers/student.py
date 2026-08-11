@@ -11,6 +11,7 @@ from app.models.user import User, RoleEnum
 from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse
 from app.core.dependencies import require_role
 from app.core.security import hash_password
+from app.utils.audit import write_audit_log
 
 router = APIRouter(prefix="/students", tags=["students"])
 
@@ -102,7 +103,7 @@ async def get_student(
 @router.post("/", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def create_student(
     request: StudentCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
+    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
     db: AsyncSession = Depends(get_db),
 ):
     if request.user_id:
@@ -144,6 +145,17 @@ async def create_student(
     )
     db.add(student)
     await db.commit()
+    
+    await write_audit_log(
+        db,
+        user_id=int(current_user["sub"]) if current_user else None,
+        action="CREATE",
+        entity_type="Student",
+        entity_id=student.id,
+        description=f"Created student {request.full_name or 'profile'}",
+    )
+    await db.commit()
+
     result = await db.execute(
         select(Student).options(selectinload(Student.user)).where(Student.id == student.id)
     )
@@ -154,7 +166,7 @@ async def create_student(
 async def update_student(
     student_id: int,
     request: StudentUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
+    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -189,6 +201,17 @@ async def update_student(
         user.password_hash = hash_password(data["password"])
 
     await db.commit()
+    
+    await write_audit_log(
+        db,
+        user_id=int(current_user["sub"]) if current_user else None,
+        action="UPDATE",
+        entity_type="Student",
+        entity_id=student.id,
+        description=f"Updated student {user.full_name if user else student.id}",
+    )
+    await db.commit()
+
     result = await db.execute(
         select(Student).options(selectinload(Student.user)).where(Student.id == student.id)
     )
@@ -198,7 +221,7 @@ async def update_student(
 @router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student(
     student_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
+    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -212,4 +235,14 @@ async def delete_student(
         await db.execute(delete(User).where(User.id == user.id))
     else:
         await db.delete(student)
+    await db.commit()
+
+    await write_audit_log(
+        db,
+        user_id=int(current_user["sub"]) if current_user else None,
+        action="DELETE",
+        entity_type="Student",
+        entity_id=student_id,
+        description=f"Deleted student {user.full_name if user else student_id}",
+    )
     await db.commit()

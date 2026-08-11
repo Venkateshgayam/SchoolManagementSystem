@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { CalendarDays, ClipboardList, Save } from "lucide-react";
 import api from "@/lib/api";
 
-interface LeaveRecord { id: number; student_id: number; from_date: string; to_date: string; reason: string | null; status: string; approved_by: number | null; remarks: string | null; created_at: string; }
+interface LeaveRecord { id: number; student_id: number | null; teacher_id: number | null; from_date: string; to_date: string; reason: string | null; status: string; approved_by: number | null; remarks: string | null; created_at: string; }
 
 const STATUSES = ["pending", "approved", "rejected"];
 
@@ -41,7 +41,7 @@ export default function ManagementLeaveRequestsPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50"><tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requester</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">To</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
@@ -52,7 +52,9 @@ export default function ManagementLeaveRequestsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {leaves.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((l) => (
                   <tr key={l.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{l.student_id}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {l.teacher_id ? `Teacher #${l.teacher_id}` : `Student #${l.student_id}`}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(l.from_date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(l.to_date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><ClipboardList className="h-4 w-4 inline mr-1 text-gray-400" />{l.reason || "—"}</td>

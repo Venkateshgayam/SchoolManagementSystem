@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { FileText, Calendar, Tag, Award } from "lucide-react";
 import api from "@/lib/api";
 
-interface ExamRecord { id: number; name: string; exam_type: string | null; start_date: string | null; end_date: string | null; academic_year: string | null; created_at: string; }
+interface ExamRecord { id: number; name: string; exam_type: string | null; academic_year: string | null; created_at: string; slots: { id: number }[]; }
 
 export default function ManagementExaminationsPage() {
   const [exams, setExams] = useState<ExamRecord[]>([]);
@@ -30,17 +30,19 @@ export default function ManagementExaminationsPage() {
               <thead className="bg-gray-50"><tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">End</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subjects</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
               </tr></thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {exams.slice().sort((a, b) => (b.start_date || "").localeCompare(a.start_date || "")).map((e) => (
+                {exams.map((e) => (
                   <tr key={e.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><Tag className="h-4 w-4 inline mr-1 text-gray-400" />{e.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{e.exam_type || "—"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{e.start_date ? new Date(e.start_date).toLocaleDateString() : "—"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{e.end_date ? new Date(e.end_date).toLocaleDateString() : "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {e.slots.length} Subjects
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{e.academic_year || "—"}</td>
                   </tr>
                 ))}

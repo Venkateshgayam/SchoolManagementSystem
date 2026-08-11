@@ -4,22 +4,29 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
+import PasswordInput from "@/components/ui/PasswordInput";
+import PageHeader from "@/components/dashboard/PageHeader";
 
-const changePasswordSchema = z.object({
-  current_password: z.string().min(1, "Current password is required"),
-  new_password: z.string().min(8, "Password must be at least 8 characters"),
-  confirm_password: z.string().min(1, "Please confirm your password"),
-}).refine((data) => data.new_password === data.confirm_password, {
-  message: "Passwords do not match",
-  path: ["confirm_password"],
-});
+const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "Current password is required"),
+    new_password: z.string().min(8, "Password must be at least 8 characters"),
+    confirm_password: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  });
 
 type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 
 export default function StudentChangePasswordPage() {
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const {
     register,
@@ -31,7 +38,7 @@ export default function StudentChangePasswordPage() {
   const onSubmit = async (data: ChangePasswordFormData) => {
     setLoading(true);
     try {
-      await api.post("/auth/change-password", {
+      await api.put("/auth/change-password", {
         current_password: data.current_password,
         new_password: data.new_password,
       });
@@ -46,30 +53,34 @@ export default function StudentChangePasswordPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Change Password</h1>
+      <button
+        onClick={() => router.back()}
+        className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </button>
+      <PageHeader title="Change Password" subtitle="Update your account password" icon={Lock} />
       <div className="card max-w-lg">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label htmlFor="current_password" className="label">Current Password</label>
-            <input id="current_password" type="password" className="input-field" {...register("current_password")} />
-            {errors.current_password && (
-              <p className="mt-1 text-sm text-danger-500">{errors.current_password.message}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="new_password" className="label">New Password</label>
-            <input id="new_password" type="password" className="input-field" {...register("new_password")} />
-            {errors.new_password && (
-              <p className="mt-1 text-sm text-danger-500">{errors.new_password.message}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="confirm_password" className="label">Confirm New Password</label>
-            <input id="confirm_password" type="password" className="input-field" {...register("confirm_password")} />
-            {errors.confirm_password && (
-              <p className="mt-1 text-sm text-danger-500">{errors.confirm_password.message}</p>
-            )}
-          </div>
+          <PasswordInput
+            id="current_password"
+            label="Current Password"
+            error={errors.current_password?.message}
+            {...register("current_password")}
+          />
+          <PasswordInput
+            id="new_password"
+            label="New Password"
+            error={errors.new_password?.message}
+            {...register("new_password")}
+          />
+          <PasswordInput
+            id="confirm_password"
+            label="Confirm New Password"
+            error={errors.confirm_password?.message}
+            {...register("confirm_password")}
+          />
           <button type="submit" disabled={loading} className="btn-primary">
             {loading ? "Changing..." : "Change Password"}
           </button>

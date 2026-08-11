@@ -228,7 +228,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
                     <Link href="/dashboard/profile" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
                       Profile
                     </Link>
-                    <Link href="/change-password" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
+                    <Link href="/dashboard/change-password" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
                       Change Password
                     </Link>
                     <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
@@ -331,7 +331,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
                     Profile
                   </Link>
                   <Link
-                    href="/change-password"
+                    href="/dashboard/change-password"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block text-center py-2.5 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 hover:bg-gray-50"
                   >

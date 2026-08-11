@@ -8,6 +8,7 @@ import { getUser } from "@/lib/auth";
 import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 interface UserRecord {
   id: number;
@@ -251,8 +252,14 @@ export default function SuperAdminUsersPage() {
               </select>
             </div>
             <div>
-              <label className="label">{creating ? "Password" : "New Password (optional)"}</label>
-              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={creating ? "At least 8 characters" : "Leave blank to keep current"} required={creating} className="input-field" />
+              <PasswordInput
+                id="password"
+                label={creating ? "Password" : "New Password (optional)"}
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder={creating ? "At least 8 characters" : "Leave blank to keep current"}
+                required={creating}
+              />
             </div>
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Account active</label>

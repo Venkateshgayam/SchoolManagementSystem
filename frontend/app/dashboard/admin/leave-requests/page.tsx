@@ -7,7 +7,7 @@ import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 
-interface LeaveRecord { id: number; student_id: number; from_date: string; to_date: string; reason: string | null; status: string; approved_by: number | null; remarks: string | null; created_at: string; }
+interface LeaveRecord { id: number; student_id: number | null; teacher_id: number | null; from_date: string; to_date: string; reason: string | null; status: string; approved_by: number | null; remarks: string | null; created_at: string; }
 
 export default function AdminLeaveRequestsPage() {
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
@@ -36,7 +36,7 @@ export default function AdminLeaveRequestsPage() {
 
   return (
     <div>
-      <PageHeader title="Leave Requests" subtitle="Review and decide on student leave requests" icon={CalendarDays} />
+      <PageHeader title="Leave Requests" subtitle="Review and decide on student and teacher leave requests" icon={CalendarDays} />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <StatCard title="Total Requests" value={leaves.length} icon={ClipboardList} />
         <StatCard title="Pending" value={pendingCount} icon={CalendarDays} />
@@ -49,7 +49,7 @@ export default function AdminLeaveRequestsPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50"><tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requester</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">To</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
@@ -60,7 +60,9 @@ export default function AdminLeaveRequestsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {leaves.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((l) => (
                   <tr key={l.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{l.student_id}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {l.teacher_id ? `Teacher #${l.teacher_id}` : `Student #${l.student_id}`}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(l.from_date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(l.to_date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><ClipboardList className="h-4 w-4 inline mr-1 text-gray-400" />{l.reason || "—"}</td>

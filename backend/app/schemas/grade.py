@@ -26,6 +26,7 @@ class GradeResponse(BaseModel):
     marks_obtained: float
     total_marks: float
     percentage: Optional[float] = None
+    letter_grade: Optional[str] = None
     created_by: Optional[int] = None
     created_at: datetime
     updated_at: datetime

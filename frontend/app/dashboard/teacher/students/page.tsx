@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, UserCheck, Mail, BookOpen } from "lucide-react";
+import { Search, UserCheck, Mail, BookOpen, Eye } from "lucide-react";
+import Link from "next/link";
 import api from "@/lib/api";
 
 interface TeacherInfo {
@@ -134,6 +135,7 @@ export default function TeacherStudentsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enrollment</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -163,6 +165,14 @@ export default function TeacherStudentsPage() {
                       >
                         {s.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <Link
+                        href={`/dashboard/teacher/students/${s.id}`}
+                        className="text-primary-600 hover:text-primary-800 flex items-center justify-end gap-1"
+                      >
+                        <Eye className="h-4 w-4" /> View Profile
+                      </Link>
                     </td>
                   </tr>
                 ))}

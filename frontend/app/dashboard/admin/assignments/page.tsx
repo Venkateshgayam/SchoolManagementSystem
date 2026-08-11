@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Plus, Save, BookOpen, Calendar, UserCheck } from "lucide-react";
+import { FileText, Plus, Save, BookOpen, Calendar, UserCheck, Pencil, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
+import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 
 interface AssignmentRecord {
   id: number;
@@ -40,7 +41,11 @@ export default function AdminAssignmentsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<AssignmentRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AssignmentRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
+
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formSubjectId, setFormSubjectId] = useState<number | "">("");
@@ -84,31 +89,70 @@ export default function AdminAssignmentsPage() {
     setFormTeacherId("");
     setFormDueDate("");
     setFormAttachmentUrl("");
+    setEditing(null);
   };
 
-  const handleCreate = async () => {
+  const openCreate = () => {
+    resetForm();
+    setOpen(true);
+  };
+
+  const openEdit = (a: AssignmentRecord) => {
+    setEditing(a);
+    setFormTitle(a.title);
+    setFormDescription(a.description || "");
+    setFormSubjectId(a.subject_id ?? "");
+    setFormClassId(a.class_id ?? "");
+    setFormTeacherId(a.teacher_id ?? "");
+    setFormDueDate(a.due_date ? new Date(a.due_date).toISOString().split('T')[0] : "");
+    setFormAttachmentUrl(a.attachment_url || "");
+    setOpen(true);
+  };
+
+  const handleSubmit = async () => {
     if (!formTitle) {
       alert("Assignment title is required.");
       return;
     }
     setSaving(true);
     try {
-      await api.post("/assignments/", {
+      const payload = {
         title: formTitle,
         description: formDescription || null,
         subject_id: formSubjectId === "" ? null : formSubjectId,
         class_id: formClassId === "" ? null : formClassId,
         teacher_id: formTeacherId === "" ? null : formTeacherId,
-        due_date: formDueDate || null,
+        // Make sure date values are offset-naive for the backend by appending time
+        due_date: formDueDate ? `${formDueDate}T23:59:59` : null,
         attachment_url: formAttachmentUrl || null,
-      });
+      };
+
+      if (editing) {
+        await api.put(`/assignments/${editing.id}`, payload);
+      } else {
+        await api.post("/assignments/", payload);
+      }
       setOpen(false);
       resetForm();
       await fetchAssignments();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to create assignment");
+      alert(err?.response?.data?.detail || "Failed to save assignment");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/assignments/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      await fetchAssignments();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Failed to delete assignment");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -140,7 +184,7 @@ export default function AdminAssignmentsPage() {
         subtitle="Manage homework and assignments"
         icon={FileText}
         action={
-          <button onClick={() => { resetForm(); setOpen(true); }} className="btn-primary flex items-center gap-2">
+          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
             <Plus className="h-4 w-4" /> New Assignment
           </button>
         }
@@ -162,6 +206,7 @@ export default function AdminAssignmentsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -172,6 +217,14 @@ export default function AdminAssignmentsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{className(a.class_id)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{a.due_date ? new Date(a.due_date).toLocaleDateString() : "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><UserCheck className="h-4 w-4 inline mr-1 text-gray-400" />{a.teacher_id ? `Teacher #${a.teacher_id}` : "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <button onClick={() => openEdit(a)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => setDeleteTarget(a)} className="text-gray-500 hover:text-red-600" title="Delete">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -181,7 +234,7 @@ export default function AdminAssignmentsPage() {
         </div>
       )}
 
-      <Modal open={open} title="New Assignment" onClose={() => setOpen(false)} maxWidth="max-w-xl">
+      <Modal open={open} title={editing ? "Edit Assignment" : "New Assignment"} onClose={() => setOpen(false)} maxWidth="max-w-xl">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">Title</label>
@@ -267,12 +320,21 @@ export default function AdminAssignmentsPage() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setOpen(false)} disabled={saving} className="btn-secondary">Cancel</button>
-            <button onClick={handleCreate} disabled={saving} className="btn-primary flex items-center gap-2">
-              <Save className="h-4 w-4" /> {saving ? "Saving…" : "Create"}
+            <button onClick={handleSubmit} disabled={saving} className="btn-primary flex items-center gap-2">
+              <Save className="h-4 w-4" /> {saving ? "Saving…" : (editing ? "Update" : "Create")}
             </button>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Assignment"
+        message={`Are you sure you want to delete ${deleteTarget?.title}? This action cannot be undone.`}
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

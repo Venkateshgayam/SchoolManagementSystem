@@ -4,7 +4,8 @@ from typing import Optional
 
 
 class LeaveRequestCreate(BaseModel):
-    student_id: int
+    student_id: Optional[int] = None
+    teacher_id: Optional[int] = None
     from_date: date
     to_date: date
     reason: Optional[str] = None
@@ -21,7 +22,8 @@ class LeaveRequestUpdate(BaseModel):
 
 class LeaveRequestResponse(BaseModel):
     id: int
-    student_id: int
+    student_id: Optional[int] = None
+    teacher_id: Optional[int] = None
     from_date: date
     to_date: date
     reason: Optional[str] = None

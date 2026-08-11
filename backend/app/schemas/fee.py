@@ -5,13 +5,14 @@ from typing import Optional
 
 class FeeCreate(BaseModel):
     student_id: int
-    amount: float = Field(..., gt=0)
+    waiver_percentage: Optional[float] = Field(0.0, ge=0.0, le=100.0)
     due_date: Optional[date] = None
     academic_year: Optional[str] = Field(None, max_length=20)
 
 
 class FeeUpdate(BaseModel):
-    amount: Optional[float] = Field(None, gt=0)
+    waiver_percentage: Optional[float] = Field(None, ge=0.0, le=100.0)
+    payment_amount: Optional[float] = Field(None, ge=0.0)
     due_date: Optional[date] = None
     paid_date: Optional[date] = None
     status: Optional[str] = Field(None, max_length=20)
@@ -21,7 +22,11 @@ class FeeUpdate(BaseModel):
 class FeeResponse(BaseModel):
     id: int
     student_id: int
-    amount: float
+    student_user_id: Optional[int] = None
+    waiver_percentage: float
+    total_fee: float = 0.0
+    amount_paid: float
+    amount_due: Optional[float] = None # Calculated field
     due_date: Optional[date] = None
     paid_date: Optional[date] = None
     status: str

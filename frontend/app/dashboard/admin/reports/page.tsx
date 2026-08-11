@@ -10,20 +10,22 @@ interface Student { id: number; user_id: number; roll_number: string | null; cla
 interface Teacher { id: number; }
 interface AttendanceRecord { status: string; }
 interface GradeRecord { percentage: number | null; marks_obtained: number; total_marks: number; }
-interface FeeRecord { status: string; amount: number; }
+interface FeeRecord { status: string; amount_paid: number; amount_due: number; total_fee: number; }
 interface LeaveRecord { status: string; }
 interface AnnouncementRecord { is_pinned: boolean; }
 interface UserRecord { role: string; is_active: boolean; }
+interface AttendanceSummary { total: number; present: number; absent: number; rate: number; }
 
 export default function AdminReportsPage() {
   const [data, setData] = useState<Record<string, any>>({});
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [students, teachers, classes, subjects, attendance, grades, fees, leaves, announcements, users] = await Promise.all([
+        const [students, teachers, classes, subjects, attendance, grades, fees, leaves, announcements, users, attendanceSummaryRes] = await Promise.all([
           api.get("/students/").catch(() => ({ data: [] })),
           api.get("/teachers/").catch(() => ({ data: [] })),
           api.get("/classes/").catch(() => ({ data: [] })),
@@ -34,19 +36,28 @@ export default function AdminReportsPage() {
           api.get("/leave-requests/").catch(() => ({ data: [] })),
           api.get("/announcements/").catch(() => ({ data: [] })),
           api.get("/users/").catch(() => ({ data: [] })),
+          api.get("/reports/attendance-summary").catch(() => ({ data: null })),
         ]);
         setData({ students: students.data, teachers: teachers.data, classes: classes.data, subjects: subjects.data, attendance: attendance.data, grades: grades.data, fees: fees.data, leaves: leaves.data, announcements: announcements.data, users: users.data });
+        setAttendanceSummary(attendanceSummaryRes.data || null);
       } catch (err: any) { setError(err?.message || "Failed to load report data"); }
       finally { setLoading(false); }
     }
     load();
   }, []);
 
-  const attendanceRate = data.attendance?.length ? (data.attendance.filter((a: AttendanceRecord) => a.status === "present").length / data.attendance.length) * 100 : 0;
+  const attendanceRate = attendanceSummary?.rate ?? (data.attendance?.length ? (data.attendance.filter((a: AttendanceRecord) => a.status === "present").length / data.attendance.length) * 100 : 0);
   const avgGrade = data.grades?.length ? data.grades.reduce((sum: number, g: GradeRecord) => sum + (g.percentage ?? (g.total_marks ? (g.marks_obtained / g.total_marks) * 100 : 0)), 0) / data.grades.length : 0;
-  const revenue = (data.fees || []).filter((f: FeeRecord) => f.status === "paid").reduce((sum: number, f: FeeRecord) => sum + f.amount, 0);
-  const pendingFees = (data.fees || []).filter((f: FeeRecord) => f.status !== "paid").reduce((sum: number, f: FeeRecord) => sum + f.amount, 0);
+  
+  console.log("REPORTS DEBUG - fees:", data.fees);
+  const revenue = Array.isArray(data.fees) ? data.fees.reduce((sum: number, f: any) => sum + (Number(f?.amount_paid) || 0), 0) : 0;
+  const pendingFees = Array.isArray(data.fees) ? data.fees.reduce((sum: number, f: any) => sum + (Number(f?.amount_due) || 0), 0) : 0;
+  const totalFeesExpected = revenue + pendingFees;
+  const feesPaidPercentage = totalFeesExpected > 0 ? (revenue / totalFeesExpected) * 100 : 0;
+  console.log("REPORTS DEBUG - calculated:", { revenue, pendingFees, totalFeesExpected, feesPaidPercentage });
+
   const pendingLeaves = (data.leaves || []).filter((l: LeaveRecord) => l.status === "pending").length;
+  const totalAnnouncements = (data.announcements || []).length;
   const pinnedAnnouncements = (data.announcements || []).filter((a: AnnouncementRecord) => a.is_pinned).length;
   const staffCount = (data.users || []).filter((u: UserRecord) => u.role === "admin" || u.role === "super_admin" || u.role === "management" || u.role === "teacher").length;
 
@@ -63,18 +74,10 @@ export default function AdminReportsPage() {
         <StatCard title="Subjects" value={data.subjects?.length ?? 0} icon={BookOpen} trend="available subjects" />
         <StatCard title="Attendance Rate" value={`${attendanceRate.toFixed(1)}%`} icon={ClipboardList} />
         <StatCard title="Average Grade" value={`${avgGrade.toFixed(2)}%`} icon={BarChart3} />
-        <StatCard title="Collected Fees" value={`$${revenue.toFixed(2)}`} icon={Receipt} />
-        <StatCard title="Pending Fees" value={`$${pendingFees.toFixed(2)}`} icon={Wallet} />
+        <StatCard title="Collected Fees" value={`₹${revenue.toFixed(2)}`} icon={Receipt} trend={`${feesPaidPercentage.toFixed(1)}% of Total (₹${totalFeesExpected.toFixed(2)})`} />
+        <StatCard title="Pending Fees" value={`₹${pendingFees.toFixed(2)}`} icon={Wallet} />
         <StatCard title="Pending Leave Requests" value={pendingLeaves} icon={ClipboardList} />
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pinned Announcements</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{pinnedAnnouncements}</p>
-            </div>
-            <Megaphone className="h-6 w-6 text-primary-600" />
-          </div>
-        </div>
+        <StatCard title="Announcements" value={totalAnnouncements} icon={Megaphone} trend={`${pinnedAnnouncements} pinned`} />
         <StatCard title="Staff Accounts" value={staffCount} icon={ShieldCheck} />
         <StatCard title="Attendance Records" value={data.attendance?.length ?? 0} icon={ClipboardList} trend={`${data.grades?.length ?? 0} grades recorded`} />
       </div>

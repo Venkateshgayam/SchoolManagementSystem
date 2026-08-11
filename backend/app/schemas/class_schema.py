@@ -10,6 +10,7 @@ class ClassCreate(BaseModel):
     teacher_id: Optional[int] = None
     school_id: Optional[int] = None
     capacity: Optional[int] = Field(None, ge=1)
+    fee_amount: float = Field(0.0, ge=0.0)
 
 
 class ClassUpdate(BaseModel):
@@ -19,6 +20,7 @@ class ClassUpdate(BaseModel):
     teacher_id: Optional[int] = None
     school_id: Optional[int] = None
     capacity: Optional[int] = Field(None, ge=1)
+    fee_amount: Optional[float] = Field(None, ge=0.0)
 
 
 class ClassResponse(BaseModel):
@@ -29,6 +31,7 @@ class ClassResponse(BaseModel):
     teacher_id: Optional[int] = None
     school_id: Optional[int] = None
     capacity: Optional[int] = None
+    fee_amount: float
     created_at: datetime
     updated_at: datetime
 

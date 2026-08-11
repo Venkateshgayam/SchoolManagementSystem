@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { useAuthGate } from "@/hooks/useAuthGate";
 import { getDashboardPath } from "@/lib/auth";
 import AuthCard from "@/components/auth/AuthCard";
+import PasswordInput from "@/components/ui/PasswordInput";
 import toast from "react-hot-toast";
 
 const loginSchema = z.object({
@@ -30,6 +31,7 @@ export default function RoleLoginForm({ role, title, subtitle, placeholder }: Ro
   const router = useRouter();
   const gate = useAuthGate();
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -40,21 +42,29 @@ export default function RoleLoginForm({ role, title, subtitle, placeholder }: Ro
 
   const onSubmit = async (data: LoginFormData) => {
     setLoading(true);
+    setServerError(null);
     try {
       const response = await api.post("/auth/login", data);
       const user = response.data.user;
       if (!user || !user.role) {
-        toast.error("Login failed. Please check your credentials.");
+        setServerError("Login failed. Please check your credentials.");
         return;
       }
       if (user.role !== role) {
-        toast.error(`This portal is for ${title} accounts only.`);
+        setServerError(`This portal is for ${title} accounts only.`);
         return;
       }
       localStorage.setItem("user", JSON.stringify(user));
       router.replace(getDashboardPath(user.role));
     } catch (error: any) {
-      toast.error(error?.response?.data?.detail || "Login failed");
+      const status = error?.response?.status;
+      const detail = error?.response?.data?.detail;
+      if (status === 401) {
+        setServerError(detail || "Invalid email or password");
+      } else {
+        setServerError(detail || "Login failed. Please try again.");
+      }
+      toast.error(detail || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -71,6 +81,11 @@ export default function RoleLoginForm({ role, title, subtitle, placeholder }: Ro
   return (
     <AuthCard title={title} subtitle={subtitle}>
       <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+        {serverError && (
+          <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-sm text-danger-700" role="alert">
+            {serverError}
+          </div>
+        )}
         <div>
           <label htmlFor="email" className="label">
             Email address
@@ -87,22 +102,13 @@ export default function RoleLoginForm({ role, title, subtitle, placeholder }: Ro
             <p className="mt-1 text-sm text-danger-500">{errors.email.message}</p>
           )}
         </div>
-        <div>
-          <label htmlFor="password" className="label">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            className="input-field"
-            placeholder="Enter your password"
-            {...register("password")}
-          />
-          {errors.password && (
-            <p className="mt-1 text-sm text-danger-500">{errors.password.message}</p>
-          )}
-        </div>
+        <PasswordInput
+          id="password"
+          label="Password"
+          placeholder="Enter your password"
+          error={errors.password?.message}
+          {...register("password")}
+        />
 
         <div className="flex items-center justify-between">
           <div className="flex items-center">

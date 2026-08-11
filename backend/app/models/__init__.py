@@ -8,7 +8,7 @@ from app.models.curriculum import Curriculum
 from app.models.topic import Topic
 from app.models.attendance import Attendance
 from app.models.grade import Grade
-from app.models.exam import Exam
+from app.models.exam import Exam, ExamSubjectSlot
 from app.models.assignment import Assignment
 from app.models.assignment_submission import AssignmentSubmission
 from app.models.announcement import Announcement
@@ -19,6 +19,8 @@ from app.models.schedule import Schedule
 from app.models.academic_calendar import AcademicCalendar
 from app.models.document import Document
 from app.models.audit_log import AuditLog
+from app.models.exam_submission import ExamSubmission
+from app.models.system_setting import SystemSetting
 
 __all__ = [
     "User",
@@ -43,4 +45,7 @@ __all__ = [
     "AcademicCalendar",
     "Document",
     "AuditLog",
+    "ExamSubmission",
+    "SystemSetting",
+    "ExamSubjectSlot",
 ]

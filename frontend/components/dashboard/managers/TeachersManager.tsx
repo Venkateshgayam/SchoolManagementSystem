@@ -8,6 +8,7 @@ import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import StatusBadge from "@/components/dashboard/StatusBadge";
+import PasswordInput from "@/components/ui/PasswordInput";
 import { can } from "@/lib/permissions";
 
 interface TeacherRecord {
@@ -293,8 +294,13 @@ export default function TeachersManager() {
               <input type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} disabled={!!editing} placeholder="e.g. john.smith" className="input-field disabled:bg-gray-100 disabled:text-gray-400" />
             </div>
             <div>
-              <label className="label">{editing ? "New Password (optional)" : "Password"}</label>
-              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? "Leave blank to keep current" : "At least 8 characters"} className="input-field" />
+              <PasswordInput
+                id="password"
+                label={editing ? "New Password (optional)" : "Password"}
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder={editing ? "Leave blank to keep current" : "At least 8 characters"}
+              />
             </div>
             <div>
               <label className="label">Experience (years)</label>

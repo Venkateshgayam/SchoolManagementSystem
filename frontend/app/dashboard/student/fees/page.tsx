@@ -78,7 +78,7 @@ export default function StudentFeesPage() {
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Outstanding</p>
           <p className="mt-2 text-3xl font-bold text-red-600">
-            ${(totalFees - paidFees).toFixed(2)}
+            ₹{(totalFees - paidFees).toFixed(2)}
           </p>
         </div>
       </div>
@@ -147,7 +147,7 @@ export default function StudentFeesPage() {
                 {fees.map((fee) => (
                   <tr key={fee.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{fee.id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${fee.amount.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{fee.amount.toFixed(2)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {fee.due_date ? new Date(fee.due_date).toLocaleDateString() : "N/A"}
                     </td>

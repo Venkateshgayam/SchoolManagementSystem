@@ -8,6 +8,7 @@ class SubjectCreate(BaseModel):
     code: Optional[str] = Field(None, max_length=50)
     description: Optional[str] = None
     school_id: Optional[int] = None
+    teacher_id: Optional[int] = None
 
 
 class SubjectUpdate(BaseModel):
@@ -15,6 +16,7 @@ class SubjectUpdate(BaseModel):
     code: Optional[str] = Field(None, max_length=50)
     description: Optional[str] = None
     school_id: Optional[int] = None
+    teacher_id: Optional[int] = None
 
 
 class SubjectResponse(BaseModel):
@@ -23,6 +25,7 @@ class SubjectResponse(BaseModel):
     code: Optional[str] = None
     description: Optional[str] = None
     school_id: Optional[int] = None
+    teacher_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, KeyRound } from "lucide-react";
 import api from "@/lib/api";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function SuperAdminChangePasswordPage() {
   const [form, setForm] = useState({ current_password: "", new_password: "", confirm: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +33,13 @@ export default function SuperAdminChangePasswordPage() {
 
   return (
     <div>
+      <button
+        onClick={() => router.back()}
+        className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </button>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Change Password</h1>
       <div className="card max-w-lg">
         <div className="flex items-center gap-2 mb-4">
@@ -39,20 +49,30 @@ export default function SuperAdminChangePasswordPage() {
         {success && <p className="text-green-700 text-sm mb-4">Password changed successfully.</p>}
         {error && <p className="text-red-700 text-sm mb-4">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-            <input type="password" value={form.current_password} onChange={(e) => setForm({ ...form, current_password: e.target.value })} required className="input" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <input type="password" value={form.new_password} onChange={(e) => setForm({ ...form, new_password: e.target.value })} required minLength={6} className="input" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-            <input type="password" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} required className="input" />
-          </div>
+          <PasswordInput
+            id="current_password"
+            label="Current Password"
+            value={form.current_password}
+            onChange={(e) => setForm({ ...form, current_password: e.target.value })}
+            required
+          />
+          <PasswordInput
+            id="new_password"
+            label="New Password"
+            value={form.new_password}
+            onChange={(e) => setForm({ ...form, new_password: e.target.value })}
+            required
+            minLength={6}
+          />
+          <PasswordInput
+            id="confirm"
+            label="Confirm New Password"
+            value={form.confirm}
+            onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+            required
+          />
           <div className="flex justify-end">
-            <button type="submit" disabled={submitting} className="btn-primary">{submitting ? "Saving…" : <span className="flex items-center gap-1"><Save className="h-4 w-4" />Change Password</span>}</button>
+            <button type="submit" disabled={submitting} className="btn-primary">{submitting ? "Saving…" : "Change Password"}</button>
           </div>
         </form>
       </div>

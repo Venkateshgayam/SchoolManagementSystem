@@ -24,9 +24,25 @@ from app.routers import (
     document_router,
     user_router,
     audit_log_router,
+    system_setting_router,
+    
+    # reports
+    reports_router,
+    exam_submission_router,
+    assignment_submission_router,
 )
 
+from fastapi.staticfiles import StaticFiles
+import os
+
 app = FastAPI(title="School Management System API", version="1.0.0")
+
+# Create uploads directory if it doesn't exist
+os.makedirs("/app/uploads/submissions/assignments", exist_ok=True)
+os.makedirs("/app/uploads/submissions/exams", exist_ok=True)
+
+# Mount static files
+app.mount("/uploads", StaticFiles(directory="/app/uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,6 +59,7 @@ app.include_router(student_router, prefix="/api", tags=["students"])
 app.include_router(teacher_router, prefix="/api", tags=["teachers"])
 app.include_router(subject_router, prefix="/api", tags=["subjects"])
 app.include_router(curriculum_router, prefix="/api", tags=["curriculum"])
+app.include_router(system_setting_router, prefix="/api", tags=["system_settings"])
 app.include_router(attendance_router, prefix="/api", tags=["attendance"])
 app.include_router(grade_router, prefix="/api", tags=["grades"])
 app.include_router(exam_router, prefix="/api", tags=["exams"])
@@ -56,6 +73,9 @@ app.include_router(notification_router, prefix="/api", tags=["notifications"])
 app.include_router(document_router, prefix="/api", tags=["documents"])
 app.include_router(user_router, prefix="/api", tags=["users"])
 app.include_router(audit_log_router, prefix="/api", tags=["audit_logs"])
+app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
+app.include_router(exam_submission_router, prefix="/api", tags=["exam_submissions"])
+app.include_router(assignment_submission_router, prefix="/api", tags=["assignment_submissions"])
 
 
 @app.on_event("startup")

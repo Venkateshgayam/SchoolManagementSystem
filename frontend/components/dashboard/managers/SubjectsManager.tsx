@@ -14,6 +14,7 @@ interface SubjectRecord {
   name: string;
   code: string | null;
   description: string | null;
+  teacher_id: number | null;
 }
 
 interface FormState {
@@ -37,9 +38,24 @@ export default function SubjectsManager() {
   const [deleteTarget, setDeleteTarget] = useState<SubjectRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [teachers, setTeachers] = useState<{ id: number; full_name?: string; user_id?: number }[]>([]);
+  const [teacherNames, setTeacherNames] = useState<Record<number, string>>({});
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<SubjectRecord | null>(null);
+  const [selectedTeacher, setSelectedTeacher] = useState<number | null>(null);
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     setPerm({ create: can("subject:create"), update: can("subject:update"), del: can("subject:delete") });
+    api.get("/teachers/").then((res) => {
+      setTeachers(res.data);
+      // Build a lookup of teacher id -> name
+      const names: Record<number, string> = {};
+      for (const t of res.data) {
+        names[t.id] = t.full_name || `Teacher #${t.id}`;
+      }
+      setTeacherNames(names);
+    }).catch(() => setTeachers([]));
   }, []);
 
   const fetchData = async () => {
@@ -175,6 +191,7 @@ export default function SubjectsManager() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
                   {(perm.update || perm.del) && (
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                   )}
@@ -186,11 +203,17 @@ export default function SubjectsManager() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><Tag className="h-4 w-4 inline mr-1 text-gray-400" />{s.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{s.code || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><FileText className="h-4 w-4 inline mr-1 text-gray-400" />{s.description || "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{s.teacher_id ? (teacherNames[s.teacher_id] || `#${s.teacher_id}`) : "—"}</td>
                     {(perm.update || perm.del) && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         {perm.update && (
                           <button onClick={() => openEdit(s)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
                             <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                        {perm.update && (
+                          <button onClick={() => { setAssignTarget(s); setAssignOpen(true); }} className="text-gray-500 hover:text-teal-600 mr-3" title="Assign Teacher">
+                            <Tag className="h-4 w-4" />
                           </button>
                         )}
                         {perm.del && (
@@ -228,6 +251,35 @@ export default function SubjectsManager() {
             <button onClick={handleSubmit} disabled={saving} className="btn-primary flex items-center gap-2">
               <Save className="h-4 w-4" /> {saving ? "Saving…" : editing ? "Update" : "Create"}
             </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={assignOpen} title={assignTarget ? `Assign Teacher — ${assignTarget.name}` : "Assign Teacher"} onClose={() => { setAssignOpen(false); setSelectedTeacher(null); setAssignTarget(null); }}>
+        <div className="space-y-4">
+          <div>
+            <label className="label">Teacher</label>
+            <select value={selectedTeacher ?? ""} onChange={(e) => setSelectedTeacher(e.target.value ? Number(e.target.value) : null)} className="input w-full">
+              <option value="">Select teacher</option>
+              {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name || `#${t.id}`}</option>)}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => { setAssignOpen(false); setSelectedTeacher(null); setAssignTarget(null); }} className="btn-secondary">Cancel</button>
+            <button onClick={async () => {
+              if (!assignTarget) return;
+              if (!selectedTeacher) { toast.error("Select a teacher"); return; }
+              setAssigning(true);
+              try {
+                await api.post(`/subjects/${assignTarget.id}/assign-teacher?teacher_id=${selectedTeacher}`);
+                toast.success("Teacher assigned to subject (updated schedules)");
+                setAssignOpen(false);
+                setSelectedTeacher(null);
+                setAssignTarget(null);
+              } catch (err: any) {
+                toast.error(err?.response?.data?.detail || "Failed to assign teacher");
+              } finally { setAssigning(false); }
+            }} className="btn-primary">{assigning ? "Assigning…" : "Assign"}</button>
           </div>
         </div>
       </Modal>

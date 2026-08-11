@@ -132,10 +132,10 @@ export default function TeacherClassesPage() {
                     Take Attendance
                   </Link>
                   <Link
-                    href={`/dashboard/teacher/students`}
+                    href={`/dashboard/teacher/classes/${c.id}`}
                     className="text-sm text-primary-600 hover:text-primary-500 font-medium"
                   >
-                    View Students
+                    View Students & Details
                   </Link>
                 </div>
               </div>
@@ -144,61 +144,6 @@ export default function TeacherClassesPage() {
         </div>
       )}
 
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">My Students</h2>
-        {myStudents.length === 0 ? (
-          <p className="text-gray-600">No students found in your classes.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enrollment</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {myStudents.map((s) => {
-                  const cls = classes.find((c) => c.id === s.class_id);
-                  const className = cls ? `${cls.name} ${cls.section || ""}`.trim() : "N/A";
-                  return (
-                    <tr key={s.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center gap-2">
-                        <UserCheck className="h-4 w-4 text-gray-400" />
-                        {s.roll_number || "N/A"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{className}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {new Date(s.enrollment_date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            s.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {s.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {teacherClasses.length > 0 && (
-        <div className="mt-6 flex items-center gap-2 text-sm text-gray-600">
-          <Users className="h-5 w-5 text-gray-400" />
-          <span>Showing {myStudents.length} student(s) across {teacherClasses.length} class(es).</span>
-        </div>
-      )}
     </div>
   );
 }

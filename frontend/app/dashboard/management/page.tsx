@@ -19,7 +19,7 @@ interface ScheduleRecord {
 }
 interface AttendanceRecord { student_id: number; status: string; }
 interface GradeRecord { marks_obtained: number; total_marks: number; percentage: number | null; }
-interface FeeRecord { amount: number; status: string; }
+interface FeeRecord { amount_paid: number; amount_due: number; status: string; }
 interface LeaveRequestRecord { student_id: number; status: string; }
 interface ExamRecord { name: string; start_date: string | null; }
 interface AssignmentRecord { title: string; due_date: string | null; }
@@ -84,8 +84,8 @@ export default function ManagementDashboard() {
     (attendance.filter((a) => a.status === "present").length / attendance.length) * 100;
   const avgPct = grades.length === 0 ? 0 :
     grades.reduce((sum, g) => sum + (g.percentage ?? (g.total_marks ? (g.marks_obtained / g.total_marks) * 100 : 0)), 0) / grades.length;
-  const revenue = fees.reduce((sum, f) => sum + (f.status === "paid" ? f.amount : 0), 0);
-  const pendingFees = fees.filter((f) => f.status === "pending" || f.status === "overdue").length;
+  const revenue = fees.reduce((sum, f) => sum + (f.amount_paid || 0), 0);
+  const pendingFees = fees.filter((f) => f.status === "unpaid" || f.status === "partial" || f.status === "overdue").length;
   const pendingLeaves = leaves.filter((l) => l.status === "pending").length;
   const unreadNotifications = notifications.filter((n) => !n.is_read).length;
   const todaySchedules = schedules.filter((s) => s.day_of_week === today);
@@ -130,7 +130,7 @@ export default function ManagementDashboard() {
         <StatCard title="Total Subjects" value={subjects.length} icon={BookOpen} />
         <StatCard title="Attendance Rate" value={`${attendanceRate.toFixed(1)}%`} icon={ClipboardCheck} trend="+1.2%" />
         <StatCard title="Average Grade" value={`${avgPct.toFixed(1)}%`} icon={TrendingUp} trend="+0.3" />
-        <StatCard title="Revenue (Paid)" value={`$${revenue.toLocaleString()}`} icon={Wallet} />
+        <StatCard title="Revenue (Paid)" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(revenue)} icon={Wallet} />
         <StatCard title="Pending Leaves" value={pendingLeaves} icon={AlertCircle} />
         <StatCard title="Overdue Assignments" value={overdueAssignments} icon={Clock} />
         <StatCard title="Unread Notifications" value={unreadNotifications} icon={Bell} />

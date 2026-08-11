@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { BookOpen, Plus, Save, Search, Pencil, Trash2, Users } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
@@ -17,6 +19,7 @@ interface ClassRecord {
   teacher_id: number | null;
   school_id: number | null;
   capacity: number | null;
+  fee_amount: number;
 }
 
 interface TeacherRecord {
@@ -31,6 +34,7 @@ interface FormState {
   academic_year: string;
   teacher_id: number | "";
   capacity: string;
+  fee_amount: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -39,6 +43,7 @@ const EMPTY_FORM: FormState = {
   academic_year: "",
   teacher_id: "",
   capacity: "",
+  fee_amount: "",
 };
 
 export default function ClassesManager() {
@@ -55,6 +60,8 @@ export default function ClassesManager() {
   const [deleteTarget, setDeleteTarget] = useState<ClassRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const pathname = usePathname();
+  const role = pathname.split("/")[2] || "admin";
 
   useEffect(() => {
     setPerm({ create: can("class:create"), update: can("class:update"), del: can("class:delete") });
@@ -110,6 +117,7 @@ export default function ClassesManager() {
       academic_year: c.academic_year || "",
       teacher_id: c.teacher_id ?? "",
       capacity: c.capacity?.toString() ?? "",
+      fee_amount: c.fee_amount?.toString() ?? "0",
     });
     setOpen(true);
   };
@@ -127,6 +135,7 @@ export default function ClassesManager() {
         academic_year: form.academic_year || null,
         teacher_id: form.teacher_id === "" ? null : form.teacher_id,
         capacity: form.capacity === "" ? null : Number(form.capacity),
+        fee_amount: Number(form.fee_amount) || 0.0,
       };
       if (editing) {
         await api.put(`/classes/${editing.id}`, body);
@@ -215,6 +224,7 @@ export default function ClassesManager() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Section</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Capacity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Base Fee</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Teacher</th>
                   {(perm.update || perm.del) && (
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -224,10 +234,17 @@ export default function ClassesManager() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filtered.map((c) => (
                   <tr key={c.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{c.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <Link href={`/dashboard/${role}/classes/${c.id}`} className="text-primary-600 hover:text-primary-800 hover:underline">
+                        {c.name}
+                      </Link>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.section || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.academic_year || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.capacity ?? "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(c.fee_amount || 0)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Users className="h-4 w-4 inline mr-1 text-gray-400" />{teacherName(c.teacher_id)}</td>
                     {(perm.update || perm.del) && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -272,6 +289,10 @@ export default function ClassesManager() {
             <div>
               <label className="label">Capacity</label>
               <input type="number" min={1} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} placeholder="e.g. 40" className="input-field" />
+            </div>
+            <div>
+              <label className="label">Base Fee Amount (₹)</label>
+              <input type="number" min={0} step="0.01" value={form.fee_amount} onChange={(e) => setForm({ ...form, fee_amount: e.target.value })} placeholder="e.g. 15000" className="input-field" />
             </div>
             <div>
               <label className="label">Class Teacher</label>

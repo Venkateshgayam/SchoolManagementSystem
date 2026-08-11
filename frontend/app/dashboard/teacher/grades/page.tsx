@@ -32,11 +32,11 @@ interface GradeRecord {
   id: number;
   student_id: number;
   subject_id: number;
-  class_id: number;
-  grade_type: string;
-  score: number;
-  max_score: number;
-  graded_by: number | null;
+  exam_id: number | null;
+  marks_obtained: number;
+  total_marks: number;
+  percentage: number | null;
+  remarks: string | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -55,8 +55,6 @@ interface AssignmentInfo {
   subject_id: number | null;
 }
 
-const GRADE_TYPES = ["exam", "assignment", "project", "quiz"];
-
 export default function TeacherGradesPage() {
   const [teacher, setTeacher] = useState<TeacherInfo | null>(null);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -67,8 +65,8 @@ export default function TeacherGradesPage() {
   const [grades, setGrades] = useState<GradeRecord[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
-  const [gradeType, setGradeType] = useState("exam");
-  const [maxScore, setMaxScore] = useState("100");
+  const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
+  const [totalMarks, setTotalMarks] = useState("100");
   const [scores, setScores] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,11 +112,19 @@ export default function TeacherGradesPage() {
   const classStudents = selectedClassId
     ? students.filter((s) => s.class_id === selectedClassId)
     : [];
+    
+  useEffect(() => {
+    if (exams.length > 0 && !exams.find(e => e.id === selectedExamId)) {
+      setSelectedExamId(exams[0].id);
+    } else if (exams.length === 0) {
+      setSelectedExamId(null);
+    }
+  }, [exams, selectedExamId]);
 
-  const existingMap = selectedClassId && selectedSubjectId
+  const existingMap = selectedSubjectId
     ? grades
         .filter(
-          (g) => g.class_id === selectedClassId && g.subject_id === selectedSubjectId && g.grade_type === gradeType
+          (g) => g.subject_id === selectedSubjectId && g.exam_id === selectedExamId
         )
         .reduce((acc, g) => {
           acc[g.student_id] = g;
@@ -128,8 +134,12 @@ export default function TeacherGradesPage() {
 
   const saveGrades = async () => {
     if (!selectedClassId || !selectedSubjectId || !teacher) return;
+    if (!selectedExamId) {
+      setMessage("Please select a specific exam to enter grades.");
+      return;
+    }
 
-    const ms = Number(maxScore);
+    const ms = Number(totalMarks);
     if (!ms || ms <= 0) return;
 
     const entries: { student_id: number; score: number }[] = [];
@@ -155,19 +165,17 @@ export default function TeacherGradesPage() {
         const existing = existingMap[entry.student_id];
         if (existing) {
           await api.put(`/grades/${existing.id}`, {
-            score: entry.score,
-            max_score: ms,
-            graded_by: teacher.user_id,
+            marks_obtained: entry.score,
+            total_marks: ms,
+            exam_id: selectedExamId,
           });
         } else {
           await api.post("/grades/", {
             student_id: entry.student_id,
             subject_id: selectedSubjectId,
-            class_id: selectedClassId,
-            grade_type: gradeType,
-            score: entry.score,
-            max_score: ms,
-            graded_by: teacher.user_id,
+            exam_id: selectedExamId,
+            marks_obtained: entry.score,
+            total_marks: ms,
           });
         }
       }
@@ -250,33 +258,39 @@ export default function TeacherGradesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Exam</label>
             <select
-              value={gradeType}
-              onChange={(e) => setGradeType(e.target.value)}
+              value={selectedExamId ?? ""}
+              onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : null)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              disabled={!selectedClassId || exams.length === 0}
             >
-              {GRADE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+              {exams.length === 0 ? (
+                <option value="" disabled>No exams found</option>
+              ) : (
+                <option value="" disabled>Select exam</option>
+              )}
+              {exams.map((ex) => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.title}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Max Score</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Total Marks</label>
             <input
               type="number"
               min="1"
-              value={maxScore}
-              onChange={(e) => setMaxScore(e.target.value)}
+              value={totalMarks}
+              onChange={(e) => setTotalMarks(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <div>
             <button
               onClick={saveGrades}
-              disabled={!selectedClassId || !selectedSubjectId || saving || classStudents.length === 0}
+              disabled={!selectedClassId || !selectedSubjectId || !selectedExamId || saving || classStudents.length === 0}
               className="w-full btn-primary flex items-center justify-center gap-2"
             >
               <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save Grades"}
@@ -322,7 +336,7 @@ export default function TeacherGradesPage() {
                 }`.trim()
               : "Class"}
             <span className="text-sm font-normal text-gray-500">
-              — {subjects.find((s) => s.id === selectedSubjectId)?.name} · {gradeType}
+              — {subjects.find((s) => s.id === selectedSubjectId)?.name} {selectedExamId ? `· ${exams.find((e) => e.id === selectedExamId)?.title}` : ""}
             </span>
           </h2>
           <div className="overflow-x-auto">
@@ -338,7 +352,7 @@ export default function TeacherGradesPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {classStudents.map((s) => {
                   const ex = existingMap[s.id];
-                  const ms = Number(maxScore);
+                  const ms = Number(totalMarks);
                   return (
                     <tr key={s.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{s.roll_number || "N/A"}</td>
@@ -348,7 +362,7 @@ export default function TeacherGradesPage() {
                           min="0"
                           max={ms}
                           step="0.1"
-                          value={scores[s.id] ?? (ex ? String(ex.score) : "")}
+                          value={scores[s.id] ?? (ex ? String(ex.marks_obtained) : "")}
                           onChange={(e) =>
                             setScores((prev) => ({ ...prev, [s.id]: e.target.value }))
                           }
@@ -358,7 +372,7 @@ export default function TeacherGradesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{ms}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {ex ? `${ex.score}/${ex.max_score}` : "—"}
+                        {ex ? `${ex.marks_obtained}/${ex.total_marks}` : "—"}
                       </td>
                     </tr>
                   );
@@ -372,9 +386,7 @@ export default function TeacherGradesPage() {
       {teacherClasses.length > 0 && (
         <div className="card mt-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Grades</h2>
-          {grades.filter(
-            (g) => teacherClasses.some((c) => c.id === g.class_id)
-          ).length === 0 ? (
+          {grades.length === 0 ? (
             <p className="text-gray-600">No recent grades.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -384,13 +396,12 @@ export default function TeacherGradesPage() {
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Student ID</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Exam</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {grades
-                    .filter((g) => teacherClasses.some((c) => c.id === g.class_id))
                     .slice()
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .slice(0, 10)
@@ -398,9 +409,9 @@ export default function TeacherGradesPage() {
                       <tr key={g.id}>
                         <td className="px-4 py-2 text-gray-700">{g.student_id}</td>
                         <td className="px-4 py-2 text-gray-700">{subjects.find((s) => s.id === g.subject_id)?.name || `#${g.subject_id}`}</td>
-                        <td className="px-4 py-2 text-gray-700">{classes.find((c) => c.id === g.class_id)?.name || `#${g.class_id}`}</td>
-                        <td className="px-4 py-2 text-gray-700">{g.grade_type}</td>
-                        <td className="px-4 py-2 text-gray-700 font-medium">{g.score}/{g.max_score}</td>
+                        <td className="px-4 py-2 text-gray-700">{classes.find((c) => c.id === students.find(st => st.id === g.student_id)?.class_id)?.name || "—"}</td>
+                        <td className="px-4 py-2 text-gray-700">{g.exam_id ? exams.find((e) => e.id === g.exam_id)?.title : "General"}</td>
+                        <td className="px-4 py-2 text-gray-700 font-medium">{g.marks_obtained}/{g.total_marks}</td>
                       </tr>
                     ))}
                 </tbody>

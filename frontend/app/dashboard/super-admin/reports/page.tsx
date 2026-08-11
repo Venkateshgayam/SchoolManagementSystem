@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   Building2, Users, UserCheck, BookOpen, GraduationCap, Megaphone,
-  ClipboardList, Wallet, FileText, ShieldCheck,
+  ClipboardList, Wallet, FileText, ShieldCheck, BarChart3,
 } from "lucide-react";
 import api from "@/lib/api";
 import StatCard from "@/components/dashboard/StatCard";
@@ -17,6 +17,7 @@ interface SubjectRecord { id: number; name: string; }
 interface AnnouncementRecord { id: number; is_pinned: boolean; created_at: string; }
 interface AuditLogRecord { id: number; action: string; created_at: string; }
 interface FeeRecord { id: number; amount: number; status: string; }
+interface AttendanceSummary { total: number; present: number; absent: number; rate: number; }
 
 export default function SuperAdminReportsPage() {
   const [schools, setSchools] = useState<SchoolRecord[]>([]);
@@ -28,13 +29,14 @@ export default function SuperAdminReportsPage() {
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [logs, setLogs] = useState<AuditLogRecord[]>([]);
   const [fees, setFees] = useState<FeeRecord[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchAll() {
       try {
-        const [sc, us, st, te, cl, su, an, lg, fe] = await Promise.all([
+        const [sc, us, st, te, cl, su, an, lg, fe, atSummary] = await Promise.all([
           api.get("/schools/").catch(() => ({ data: [] })),
           api.get("/users/").catch(() => ({ data: [] })),
           api.get("/students/").catch(() => ({ data: [] })),
@@ -44,6 +46,7 @@ export default function SuperAdminReportsPage() {
           api.get("/announcements/").catch(() => ({ data: [] })),
           api.get("/audit-logs/").catch(() => ({ data: [] })),
           api.get("/fees/").catch(() => ({ data: [] })),
+          api.get("/reports/attendance-summary").catch(() => ({ data: null })),
         ]);
         setSchools(sc.data);
         setUsers(us.data);
@@ -54,6 +57,7 @@ export default function SuperAdminReportsPage() {
         setAnnouncements(an.data);
         setLogs(lg.data);
         setFees(fe.data);
+        setAttendanceSummary(atSummary.data || null);
       } catch (err: any) {
         setError(err?.message || "Failed to load reports");
       } finally {
@@ -70,6 +74,7 @@ export default function SuperAdminReportsPage() {
   const totalRevenue = fees.filter((f) => f.status === "paid").reduce((sum, f) => sum + f.amount, 0);
   const pendingFees = fees.filter((f) => f.status === "pending" || f.status === "overdue").length;
   const pinnedAnnouncements = announcements.filter((a) => a.is_pinned).length;
+  const attendanceRate = attendanceSummary?.rate ?? 0;
 
   if (loading) return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading reports…</div></div>;
   if (error) return (<div className="card max-w-lg mx-auto text-center py-8"><p className="text-gray-600 mb-4">{error}</p><button onClick={() => window.location.reload()} className="btn-primary">Retry</button></div>);
@@ -85,8 +90,9 @@ export default function SuperAdminReportsPage() {
         <StatCard title="Teachers" value={teachers.length} icon={UserCheck} />
         <StatCard title="Classes" value={classes.length} icon={BookOpen} />
         <StatCard title="Subjects" value={subjects.length} icon={BookOpen} />
-        <StatCard title="Announcements" value={announcements.length} icon={Megaphone} />
+        <StatCard title="Announcements" value={announcements.length} icon={Megaphone} trend={`${pinnedAnnouncements} pinned`} />
         <StatCard title="Audit Logs (recent)" value={logs.length} icon={ClipboardList} />
+        <StatCard title="Attendance Rate" value={`${attendanceRate.toFixed(1)}%`} icon={BarChart3} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -125,7 +131,7 @@ export default function SuperAdminReportsPage() {
           </div>
           <div className="border-t border-gray-100 mt-4 pt-3 text-sm text-gray-600 flex items-center gap-1">
             <Wallet className="h-4 w-4 text-gray-400" />
-            <span className="font-medium">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> collected
+            <span className="font-medium">₹{totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> collected
           </div>
         </div>
 

@@ -6,6 +6,7 @@ from app.database.database import get_db
 from app.models.announcement import Announcement
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate, AnnouncementResponse
 from app.core.dependencies import require_role
+from app.utils.audit import write_audit_log
 
 router = APIRouter(prefix="/announcements", tags=["announcements"])
 
@@ -43,6 +44,17 @@ async def create_announcement(
     db.add(announcement)
     await db.commit()
     await db.refresh(announcement)
+
+    await write_audit_log(
+        db,
+        user_id=int(current_user["sub"]) if current_user else None,
+        action="CREATE",
+        entity_type="Announcement",
+        entity_id=announcement.id,
+        description=f"Created announcement {announcement.title}",
+    )
+    await db.commit()
+
     return announcement
 
 
@@ -62,6 +74,17 @@ async def update_announcement(
         setattr(announcement, key, value)
     await db.commit()
     await db.refresh(announcement)
+
+    await write_audit_log(
+        db,
+        user_id=int(current_user["sub"]) if current_user else None,
+        action="UPDATE",
+        entity_type="Announcement",
+        entity_id=announcement.id,
+        description=f"Updated announcement {announcement.title}",
+    )
+    await db.commit()
+
     return announcement
 
 
@@ -76,4 +99,14 @@ async def delete_announcement(
     if not announcement:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Announcement not found")
     await db.delete(announcement)
+    await db.commit()
+
+    await write_audit_log(
+        db,
+        user_id=int(current_user["sub"]) if current_user else None,
+        action="DELETE",
+        entity_type="Announcement",
+        entity_id=announcement_id,
+        description=f"Deleted announcement {announcement_id}",
+    )
     await db.commit()
