@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.database.database import get_db
 from app.models.class_model import Class
 from app.models.teacher import Teacher
+from app.models.student import Student
 from app.schemas.class_schema import ClassCreate, ClassUpdate, ClassResponse
 from app.core.dependencies import require_role
 
@@ -23,14 +24,19 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
 
 @router.get("/", response_model=List[ClassResponse])
 async def list_classes(
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     if current_user.get("role") == "teacher":
         class_ids = await _teacher_class_ids(db, current_user)
         if not class_ids:
             return []
         result = await db.execute(select(Class).where(Class.id.in_(class_ids)))
+    elif current_user.get("role") == "student":
+        student = (await db.execute(select(Student).where(Student.user_id == int(current_user["sub"])))).scalar_one_or_none()
+        if student and student.class_id:
+            result = await db.execute(select(Class).where(Class.id == student.class_id))
+        else:
+            return []
     else:
         result = await db.execute(select(Class))
     classes = result.scalars().all()
@@ -40,9 +46,8 @@ async def list_classes(
 @router.get("/{class_id}", response_model=ClassResponse)
 async def get_class(
     class_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Class).where(Class.id == class_id))
     class_obj = result.scalar_one_or_none()
     if not class_obj:
@@ -51,15 +56,18 @@ async def get_class(
         class_ids = await _teacher_class_ids(db, current_user)
         if class_id not in class_ids:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    elif current_user.get("role") == "student":
+        student = (await db.execute(select(Student).where(Student.user_id == int(current_user["sub"])))).scalar_one_or_none()
+        if not student or student.class_id != class_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return class_obj
 
 
 @router.post("/", response_model=ClassResponse)
 async def create_class(
     request: ClassCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     class_obj = Class(**request.model_dump(exclude_unset=True))
     db.add(class_obj)
     await db.commit()
@@ -71,9 +79,8 @@ async def create_class(
 async def update_class(
     class_id: int,
     request: ClassUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Class).where(Class.id == class_id))
     class_obj = result.scalar_one_or_none()
     if not class_obj:
@@ -89,9 +96,8 @@ async def update_class(
 @router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_class(
     class_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Class).where(Class.id == class_id))
     class_obj = result.scalar_one_or_none()
     if not class_obj:

@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
@@ -81,7 +82,7 @@ export default function StudentAnnouncementsPage() {
                 </div>
                 <p className="mt-2 text-sm text-gray-600">{announcement.content}</p>
                 <p className="mt-2 text-xs text-gray-400">
-                  {new Date(announcement.created_at).toLocaleDateString()}
+                  {formatDate(announcement.created_at)}
                 </p>
               </div>
             ))}

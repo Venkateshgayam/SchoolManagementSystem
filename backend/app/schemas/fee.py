@@ -27,6 +27,7 @@ class FeeResponse(BaseModel):
     total_fee: float = 0.0
     amount_paid: float
     amount_due: Optional[float] = None # Calculated field
+    late_fee_applied: float = 0.0
     due_date: Optional[date] = None
     paid_date: Optional[date] = None
     status: str

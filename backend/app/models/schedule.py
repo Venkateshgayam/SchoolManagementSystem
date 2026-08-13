@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, timezone, time
 from sqlalchemy import Integer, ForeignKey, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base
@@ -16,8 +16,8 @@ class Schedule(Base):
     start_time: Mapped[time] = mapped_column(nullable=False)
     end_time: Mapped[time] = mapped_column(nullable=False)
     academic_year: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     class_ref = relationship("Class", backref="schedules")
     subject = relationship("Subject", backref="schedules")

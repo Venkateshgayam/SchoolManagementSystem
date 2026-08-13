@@ -1,10 +1,12 @@
 "use client";
 
+import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
 import { Calendar, Plus, Save, Tag, FileText } from "lucide-react";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
+import toast from "react-hot-toast";
 
 interface CalendarEvent {
   id: number;
@@ -47,11 +49,11 @@ export default function AdminAcademicCalendarPage() {
 
   const handleCreate = async () => {
     if (!formTitle) {
-      alert("Event title is required.");
+      toast.error("Event title is required.");
       return;
     }
     if (!formEventDate) {
-      alert("Event date is required.");
+      toast.error("Event date is required.");
       return;
     }
     setSaving(true);
@@ -66,7 +68,7 @@ export default function AdminAcademicCalendarPage() {
       resetForm();
       await fetchEvents();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to create calendar event");
+      toast.error(err?.response?.data?.detail || "Failed to create calendar event");
     } finally {
       setSaving(false);
     }
@@ -118,7 +120,7 @@ export default function AdminAcademicCalendarPage() {
                 {events.slice().sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime()).map((e) => (
                   <tr key={e.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{e.title}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{new Date(e.event_date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{formatDate(e.event_date)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Tag className="h-4 w-4 inline mr-1 text-gray-400" />{e.event_type || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><FileText className="h-4 w-4 inline mr-1 text-gray-400" />{e.description || "—"}</td>
                   </tr>

@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+import secrets
+import string
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -13,6 +15,16 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def generate_temporary_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    while True:
+        password = ''.join(secrets.choice(alphabet) for i in range(length))
+        if (any(c.islower() for c in password) and 
+            any(c.isupper() for c in password) and 
+            any(c.isdigit() for c in password)):
+            return password
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

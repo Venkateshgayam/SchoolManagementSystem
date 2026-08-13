@@ -18,10 +18,15 @@ class GradeUpdate(BaseModel):
     exam_id: Optional[int] = None
 
 
+class SubjectBase(BaseModel):
+    id: int
+    name: str
+    
 class GradeResponse(BaseModel):
     id: int
     student_id: int
     subject_id: int
+    subject: Optional[SubjectBase] = None
     exam_id: Optional[int] = None
     marks_obtained: float
     total_marks: float

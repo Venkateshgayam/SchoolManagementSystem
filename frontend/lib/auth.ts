@@ -1,13 +1,20 @@
-export const KNOWN_ROLES = ["student", "teacher", "management", "admin", "super_admin"] as const;
+export const KNOWN_ROLES = ["student", "teacher", "admin"] as const;
 
 export type Role = (typeof KNOWN_ROLES)[number];
+
+// Legacy roles that map to admin for backward compatibility
+const LEGACY_TO_ADMIN = ["management", "super_admin", "superadmin"];
+
+export function normalizeRole(role: string | null | undefined): string | null {
+  if (!role) return null;
+  if (LEGACY_TO_ADMIN.includes(role)) return "admin";
+  return role;
+}
 
 export const ROLE_SLUGS: Record<string, string> = {
   student: "student",
   teacher: "teacher",
-  management: "management",
   admin: "admin",
-  super_admin: "super-admin",
 };
 
 export function getUser(): any | null {
@@ -32,51 +39,42 @@ export function slugToRole(slug: string | null | undefined): string | null {
 }
 
 export function getDashboardPath(role?: string | null): string {
-  switch (role) {
+  const normalized = normalizeRole(role);
+  switch (normalized) {
     case "student":
       return "/dashboard/student";
     case "teacher":
       return "/dashboard/teacher";
-    case "management":
-      return "/dashboard/management";
     case "admin":
       return "/dashboard/admin";
-    case "super_admin":
-      return "/dashboard/super-admin";
     default:
       return "/dashboard";
   }
 }
 
 export function getLoginPath(role?: string | null): string {
-  switch (role) {
+  const normalized = normalizeRole(role);
+  switch (normalized) {
     case "student":
       return "/login/student";
     case "teacher":
       return "/login/teacher";
-    case "management":
-      return "/login/management";
     case "admin":
       return "/admin/login";
-    case "super_admin":
-      return "/super-admin/login";
     default:
       return "/login";
   }
 }
 
 export function getRoleTitle(role?: string | null): string {
-  switch (role) {
+  const normalized = normalizeRole(role);
+  switch (normalized) {
     case "student":
       return "Student";
     case "teacher":
       return "Teacher";
-    case "management":
-      return "Management";
     case "admin":
       return "Admin";
-    case "super_admin":
-      return "Super Admin";
     default:
       return "Portal";
   }

@@ -6,6 +6,7 @@ import { Menu, Bell, User, LogOut, ChevronDown, X, ChevronRight } from "lucide-r
 import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { getUser, getLoginPath } from "@/lib/auth";
+import { useSettings } from "@/hooks/useSettings";
 
 const menuSections = [
   {
@@ -22,7 +23,7 @@ const menuSections = [
       { href: "/about", label: "About School" },
       { href: "/mission-vision", label: "Mission & Vision" },
       { href: "/principal-message", label: "Principal's Message" },
-      { href: "/management", label: "Management" },
+
       { href: "/school-information", label: "School Information" },
     ],
   },
@@ -65,7 +66,7 @@ const menuSections = [
     links: [
       { href: "/login/student", label: "Student" },
       { href: "/login/teacher", label: "Teacher" },
-      { href: "/login/management", label: "Management" },
+      { href: "/admin/login", label: "Admin" },
     ],
   },
 ];
@@ -78,6 +79,11 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [user, setUser] = useState<{ full_name: string; role?: string } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const { settings } = useSettings();
+  const schoolName = settings.school_name || "School Management";
+  const schoolInitials = schoolName.split(" ").map((w: string) => w[0]).join("").substring(0, 3).toUpperCase() || "SMS";
 
   useEffect(() => {
     setUser(getUser());
@@ -85,7 +91,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const isDashboard = !!onMenuClick;
 
-  const authPaths = ["/login", "/admin/login", "/super-admin/login"];
+  const authPaths = ["/login", "/admin/login"];
   const isAuthPage = pathname
     ? authPaths.some((p) => pathname === p || pathname.startsWith(p + "/"))
     : false;
@@ -167,10 +173,37 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
   }, [mobileMenuOpen]);
 
   useEffect(() => {
+    const handleUserMenuClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    const handleUserMenuEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setUserMenuOpen(false);
+      }
+    };
+    if (userMenuOpen) {
+      document.addEventListener("mousedown", handleUserMenuClickOutside);
+      document.addEventListener("keydown", handleUserMenuEscape);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleUserMenuClickOutside);
+      document.removeEventListener("keydown", handleUserMenuEscape);
+    };
+  }, [userMenuOpen]);
+
+  useEffect(() => {
     if (!mobileMenuOpen) {
       setExpandedSection(null);
     }
   }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (user && !isDashboard && mobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+  }, [user, isDashboard, mobileMenuOpen]);
 
   if (!isDashboard && pathname?.startsWith("/dashboard")) {
     return null;
@@ -182,26 +215,22 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <button
-              onClick={isDashboard ? onMenuClick : () => setMobileMenuOpen(!mobileMenuOpen)}
-              className={`p-2 rounded-md text-gray-600 hover:text-gray-900 ${isDashboard ? "lg:hidden" : ""}`}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+            {(!user || isDashboard) && (
+              <button
+                onClick={isDashboard ? onMenuClick : () => setMobileMenuOpen(!mobileMenuOpen)}
+                className={`p-2 rounded-md text-gray-600 hover:text-gray-900 ${isDashboard ? "lg:hidden" : ""}`}
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            )}
             <Link href="/" className="flex items-center">
-              <div className="bg-primary-600 text-white font-bold text-xl px-3 py-1 rounded-lg">SMS</div>
-              <span className="ml-2 font-semibold text-gray-900 hidden sm:block">School Management</span>
+              <div className="bg-primary-600 text-white font-bold text-xl px-3 py-1 rounded-lg">{schoolInitials}</div>
+              <span className="ml-2 font-semibold text-gray-900 hidden sm:block">{schoolName}</span>
             </Link>
           </div>
           {!isAuthPage && user && (
-            <div className="hidden lg:flex items-center space-x-4">
-              <Link
-                href="/dashboard"
-                className="text-sm font-semibold text-primary-700 hover:text-primary-800 transition-colors"
-              >
-                Dashboard
-              </Link>
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Link
                 href="/dashboard/notifications"
                 className="relative p-2 text-gray-600 hover:text-gray-900"
@@ -214,7 +243,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
                   </span>
                 )}
               </Link>
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center space-x-2 text-sm font-medium text-gray-700 hover:text-gray-900"
@@ -225,20 +254,20 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 </button>
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-100">
-                    <Link href="/dashboard/profile" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
+                    <Link href="/dashboard/profile" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
                       Profile
                     </Link>
-                    <Link href="/dashboard/change-password" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
+                    <Link href="/dashboard/change-password" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
                       Change Password
                     </Link>
-                    <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
+                    <Link href="/dashboard" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
                       Dashboard
                     </Link>
-                    <Link href="/" className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
+                    <Link href="/" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-primary-700">
                       Home
                     </Link>
                     <hr className="my-1 border-gray-100" />
-                    <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-danger-600">
+                    <button onClick={() => { setUserMenuOpen(false); handleLogout(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-danger-600">
                       Sign out
                     </button>
                   </div>
@@ -249,7 +278,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
       </div>
 
-      {mobileMenuOpen && (
+      {mobileMenuOpen && (!user || isDashboard) && (
         <>
           <div
             className="fixed inset-0 z-40 bg-black bg-opacity-30 transition-opacity"

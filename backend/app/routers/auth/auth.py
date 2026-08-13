@@ -168,9 +168,8 @@ async def reset_password(request: ResetPasswordRequest):
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(request: UserCreate, current_user: dict = Depends(require_role("admin", "super_admin")), db: AsyncSession = Depends(get_db)):
-    if request.role == RoleEnum.super_admin and current_user.get("role") != RoleEnum.super_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only super admins can create super admin accounts")
+async def register(request: UserCreate, current_user: dict = Depends(require_role("admin")), db: AsyncSession = Depends(get_db)):
+
     result = await db.execute(select(User).where(User.email == request.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")

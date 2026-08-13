@@ -28,9 +28,8 @@ async def _teacher_subject_ids(db: AsyncSession, current_user: dict) -> set:
 
 @router.get("/", response_model=List[SubjectResponse])
 async def list_subjects(
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     if current_user.get("role") == "teacher":
         subject_ids = await _teacher_subject_ids(db, current_user)
         if not subject_ids:
@@ -45,9 +44,8 @@ async def list_subjects(
 @router.get("/{subject_id}", response_model=SubjectResponse)
 async def get_subject(
     subject_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Subject).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
@@ -62,9 +60,8 @@ async def get_subject(
 @router.post("/", response_model=SubjectResponse)
 async def create_subject(
     request: SubjectCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     subject = Subject(**request.model_dump(exclude_unset=True))
     db.add(subject)
     await db.commit()
@@ -76,8 +73,7 @@ async def create_subject(
         action="CREATE",
         entity_type="Subject",
         entity_id=subject.id,
-        description=f"Created subject {subject.name}",
-    )
+        description=f"Created subject {subject.name}")
     await db.commit()
 
     return subject
@@ -87,9 +83,8 @@ async def create_subject(
 async def update_subject(
     subject_id: int,
     request: SubjectUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Subject).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
@@ -106,8 +101,7 @@ async def update_subject(
         action="UPDATE",
         entity_type="Subject",
         entity_id=subject.id,
-        description=f"Updated subject {subject.name}",
-    )
+        description=f"Updated subject {subject.name}")
     await db.commit()
 
     return subject
@@ -116,9 +110,8 @@ async def update_subject(
 @router.delete("/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_subject(
     subject_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Subject).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
@@ -132,8 +125,7 @@ async def delete_subject(
         action="DELETE",
         entity_type="Subject",
         entity_id=subject_id,
-        description=f"Deleted subject {subject.name}",
-    )
+        description=f"Deleted subject {subject.name}")
     await db.commit()
 
 
@@ -141,9 +133,8 @@ async def delete_subject(
 async def assign_teacher_to_subject(
     subject_id: int,
     teacher_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Subject).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
@@ -163,8 +154,7 @@ async def assign_teacher_to_subject(
         action="ASSIGN_TEACHER",
         entity_type="Subject",
         entity_id=subject.id,
-        description=f"Assigned teacher ID {teacher_id} to subject {subject.name}",
-    )
+        description=f"Assigned teacher ID {teacher_id} to subject {subject.name}")
     await db.commit()
 
     return subject

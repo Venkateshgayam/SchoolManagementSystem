@@ -70,6 +70,8 @@ def upgrade() -> None:
         sa.Column("teacher_id", sa.Integer(), sa.ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True),
         sa.Column("school_id", sa.Integer(), sa.ForeignKey("schools.id", ondelete="SET NULL"), nullable=True),
         sa.Column("capacity", sa.Integer(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
     )
 
     op.create_table(
@@ -128,6 +130,29 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "exams",
+        sa.Column("id", sa.Integer(), primary_key=True, index=True),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("exam_type", sa.String(length=50), nullable=True),
+        sa.Column("start_date", sa.DateTime(), nullable=True),
+        sa.Column("end_date", sa.DateTime(), nullable=True),
+        sa.Column("academic_year", sa.String(length=20), nullable=True),
+        sa.Column("created_by", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+    )
+
+    op.create_table(
+        "exam_submissions",
+        sa.Column("id", sa.Integer(), primary_key=True, index=True),
+        sa.Column("exam_id", sa.Integer(), sa.ForeignKey("exams.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("student_id", sa.Integer(), sa.ForeignKey("students.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("submission_text", sa.Text(), nullable=True),
+        sa.Column("submitted_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column("grade", sa.Float(), nullable=True),
+        sa.UniqueConstraint("exam_id", "student_id", name="uq_exam_submission"),
+    )
+
+    op.create_table(
         "grades",
         sa.Column("id", sa.Integer(), primary_key=True, index=True),
         sa.Column("student_id", sa.Integer(), sa.ForeignKey("students.id", ondelete="CASCADE"), nullable=False),
@@ -139,18 +164,6 @@ def upgrade() -> None:
         sa.Column("created_by", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
-    )
-
-    op.create_table(
-        "exams",
-        sa.Column("id", sa.Integer(), primary_key=True, index=True),
-        sa.Column("name", sa.String(length=255), nullable=False),
-        sa.Column("exam_type", sa.String(length=50), nullable=True),
-        sa.Column("start_date", sa.DateTime(), nullable=True),
-        sa.Column("end_date", sa.DateTime(), nullable=True),
-        sa.Column("academic_year", sa.String(length=20), nullable=True),
-        sa.Column("created_by", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
 
     op.create_table(
@@ -209,7 +222,7 @@ def upgrade() -> None:
         sa.Column("amount", sa.Float(), nullable=False),
         sa.Column("due_date", sa.Date(), nullable=True),
         sa.Column("paid_date", sa.Date(), nullable=True),
-        sa.Column("status", sa.Enum("pending", "paid", "overdue", name="feestatusenum"), nullable=False, server_default="pending"),
+        sa.Column("status", sa.Enum("PENDING", "PARTIAL", "PAID", "OVERDUE", "WAIVED", name="feestatusenum"), nullable=False, server_default="PENDING"),
         sa.Column("academic_year", sa.String(length=20), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),

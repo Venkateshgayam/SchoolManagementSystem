@@ -1,9 +1,12 @@
 "use client";
 
+import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
+import PageLoader from "@/components/dashboard/PageLoader";
 import StatCard from "@/components/dashboard/StatCard";
-import { BookOpen, Users, ClipboardList, FileText, AlertCircle, Clock, Bell, TrendingUp } from "lucide-react";
+import { BookOpen, CreditCard, ClipboardList, FileText, AlertCircle, Clock, Bell, TrendingUp, AlertTriangle } from "lucide-react";
 import api from "@/lib/api";
+import { useSettings } from "@/hooks/useSettings";
 
 interface AttendanceRecord {
   id: number;
@@ -124,6 +127,10 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { settings } = useSettings();
+  const attendanceThreshold = settings.attendance_at_risk_threshold || 75;
+  const currencySymbol = settings.currency_symbol || "$";
+
   useEffect(() => {
     async function fetchAll() {
       try {
@@ -202,13 +209,7 @@ export default function StudentDashboard() {
     fetchAll();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading dashboard...</div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader label="Loading dashboard..." />;
 
   if (error) {
     return (
@@ -231,8 +232,8 @@ export default function StudentDashboard() {
   const attendancePercent = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
 
   const totalFees = feesData.reduce((sum, f) => sum + f.amount, 0);
-  const paidFees = feesData.filter((f) => f.status === "paid").reduce((sum, f) => sum + f.amount, 0);
-  const pendingFees = feesData.filter((f) => f.status === "pending").length;
+  const paidFees = feesData.filter((f) => f.status === "PAID").reduce((sum, f) => sum + f.amount, 0);
+  const pendingFees = feesData.filter((f) => f.status === "PENDING").length;
 
   const upcomingExams = examsData.filter((e) => e.start_date && new Date(e.start_date) >= new Date());
   const pendingAssignments = assignmentsData.filter(
@@ -263,7 +264,15 @@ const dayMap: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 
           title="Attendance"
           value={`${attendancePercent}%`}
           icon={ClipboardList}
-          trend={`${presentCount} present`}
+          trend={
+            attendancePercent < attendanceThreshold ? (
+              <span className="flex items-center text-red-600 font-medium">
+                <AlertTriangle className="h-3 w-3 mr-1" /> Below {attendanceThreshold}%
+              </span>
+            ) : (
+              `${presentCount} present`
+            )
+          }
         />
         <StatCard
           title="Grades"
@@ -279,8 +288,8 @@ const dayMap: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 
         />
         <StatCard
           title="Fees"
-          value={pendingFees > 0 ? `$${totalFees - paidFees} due` : "Paid"}
-          icon={Users}
+          value={pendingFees > 0 ? `${currencySymbol}${totalFees - paidFees} due` : "Paid"}
+          icon={CreditCard}
           trend={pendingFees > 0 ? `${pendingFees} pending` : "Up to date"}
         />
       </div>
@@ -337,7 +346,7 @@ const dayMap: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 
                     <p className="font-medium text-gray-900">{e.name}</p>
                     <p className="text-sm text-gray-500">
                       {e.exam_type && `${e.exam_type} · `}
-                      {e.start_date && new Date(e.start_date).toLocaleDateString()}
+                      {e.start_date && formatDate(e.start_date)}
                     </p>
                   </div>
                 </div>
@@ -378,7 +387,7 @@ const dayMap: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 
                 <div>
                   <p className="font-medium text-gray-900">{a.title}</p>
                   <p className="text-sm text-gray-500">
-                    Due: {a.due_date ? new Date(a.due_date).toLocaleDateString() : "N/A"}
+                    Due: {a.due_date ? formatDate(a.due_date) : "N/A"}
                   </p>
                 </div>
               </div>

@@ -10,6 +10,7 @@ class AssignmentCreate(BaseModel):
     class_id: Optional[int] = None
     teacher_id: Optional[int] = None
     due_date: Optional[datetime] = None
+    total_marks: Optional[int] = None
     attachment_url: Optional[str] = Field(None, max_length=500)
 
 
@@ -20,6 +21,7 @@ class AssignmentUpdate(BaseModel):
     class_id: Optional[int] = None
     teacher_id: Optional[int] = None
     due_date: Optional[datetime] = None
+    total_marks: Optional[int] = None
     attachment_url: Optional[str] = Field(None, max_length=500)
 
 
@@ -31,6 +33,7 @@ class AssignmentResponse(BaseModel):
     class_id: Optional[int] = None
     teacher_id: Optional[int] = None
     due_date: Optional[datetime] = None
+    total_marks: Optional[int] = None
     attachment_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime

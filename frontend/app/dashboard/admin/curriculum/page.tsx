@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
+import toast from "react-hot-toast";
 
 interface CurriculumRecord {
   id: number;
@@ -76,7 +77,7 @@ export default function AdminCurriculumPage() {
 
   const handleCreate = async () => {
     if (formSubjectId === "" || formClassId === "") {
-      alert("Subject and class are required.");
+      toast.error("Subject and class are required.");
       return;
     }
     setSaving(true);
@@ -91,7 +92,7 @@ export default function AdminCurriculumPage() {
       resetForm();
       await fetchCurriculum();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to create curriculum");
+      toast.error(err?.response?.data?.detail || "Failed to create curriculum");
     } finally {
       setSaving(false);
     }
@@ -105,7 +106,7 @@ export default function AdminCurriculumPage() {
       setDeleteTarget(null);
       await fetchCurriculum();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to delete curriculum");
+      toast.error(err?.response?.data?.detail || "Failed to delete curriculum");
     } finally {
       setDeleting(false);
     }

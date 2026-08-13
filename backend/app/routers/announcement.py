@@ -13,9 +13,8 @@ router = APIRouter(prefix="/announcements", tags=["announcements"])
 
 @router.get("/", response_model=List[AnnouncementResponse])
 async def list_announcements(
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Announcement))
     announcements = result.scalars().all()
     return announcements
@@ -24,9 +23,8 @@ async def list_announcements(
 @router.get("/{announcement_id}", response_model=AnnouncementResponse)
 async def get_announcement(
     announcement_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
     announcement = result.scalar_one_or_none()
     if not announcement:
@@ -37,9 +35,8 @@ async def get_announcement(
 @router.post("/", response_model=AnnouncementResponse)
 async def create_announcement(
     request: AnnouncementCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
     announcement = Announcement(**request.model_dump(exclude_unset=True))
     db.add(announcement)
     await db.commit()
@@ -51,8 +48,7 @@ async def create_announcement(
         action="CREATE",
         entity_type="Announcement",
         entity_id=announcement.id,
-        description=f"Created announcement {announcement.title}",
-    )
+        description=f"Created announcement {announcement.title}")
     await db.commit()
 
     return announcement
@@ -62,9 +58,8 @@ async def create_announcement(
 async def update_announcement(
     announcement_id: int,
     request: AnnouncementUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
     announcement = result.scalar_one_or_none()
     if not announcement:
@@ -81,8 +76,7 @@ async def update_announcement(
         action="UPDATE",
         entity_type="Announcement",
         entity_id=announcement.id,
-        description=f"Updated announcement {announcement.title}",
-    )
+        description=f"Updated announcement {announcement.title}")
     await db.commit()
 
     return announcement
@@ -91,9 +85,8 @@ async def update_announcement(
 @router.delete("/{announcement_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_announcement(
     announcement_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
     announcement = result.scalar_one_or_none()
     if not announcement:
@@ -107,6 +100,5 @@ async def delete_announcement(
         action="DELETE",
         entity_type="Announcement",
         entity_id=announcement_id,
-        description=f"Deleted announcement {announcement_id}",
-    )
+        description=f"Deleted announcement {announcement_id}")
     await db.commit()

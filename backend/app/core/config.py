@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     REFRESH_TOKEN_EXPIRE_DAYS: int
     ENVIRONMENT: str
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int | None = None
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    EMAILS_FROM_EMAIL: str | None = None
+    EMAILS_FROM_NAME: str | None = None
 
 
 settings = Settings()

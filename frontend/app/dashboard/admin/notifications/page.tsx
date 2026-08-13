@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
 import Modal from "@/components/dashboard/Modal";
+import toast from "react-hot-toast";
 
 interface NotificationRecord { id: number; user_id: number; title: string; message: string | null; type: string | null; is_read: boolean; created_at: string; }
 interface UserRecord { id: number; email: string; full_name: string; role: string; }
@@ -47,7 +48,7 @@ export default function AdminNotificationsPage() {
       setModalOpen(false);
       setForm({ user_id: "", title: "", message: "", type: "general" });
       await load();
-    } catch (err: any) { alert(err?.response?.data?.detail || err?.message || "Could not create notification"); }
+    } catch (err: any) { toast.error(err?.response?.data?.detail || err?.message || "Could not create notification"); }
     finally { setSaving(false); }
   };
 
@@ -93,22 +94,22 @@ export default function AdminNotificationsPage() {
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
-            <select value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })} required className="input">
+            <select value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })} required className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white">
               <option value="">Select user</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.full_name || u.email} ({u.role})</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-            <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={255} className="input" />
+            <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={255} className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-            <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="input" rows={3} />
+            <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white" rows={3} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input">
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white">
               {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>

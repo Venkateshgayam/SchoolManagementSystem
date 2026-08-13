@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { ClipboardList, Calendar, TrendingUp } from "lucide-react";
@@ -121,7 +122,7 @@ export default function StudentAttendancePage() {
                   .map((record) => (
                     <tr key={record.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(record.date).toLocaleDateString()}
+                        {formatDate(record.date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span

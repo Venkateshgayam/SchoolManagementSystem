@@ -1,10 +1,13 @@
 "use client";
 
+import { formatDate } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { BookOpen, Users, Save, PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Paperclip, Pencil } from "lucide-react";
 import api from "@/lib/api";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
+import toast from "react-hot-toast";
+import { useSettings } from "@/hooks/useSettings";
 
 interface TeacherInfo {
   id: number;
@@ -14,8 +17,8 @@ interface TeacherInfo {
 interface StudentInfo {
   id: number;
   user_id: number;
-  first_name: string;
-  last_name: string;
+  full_name?: string;
+  roll_number?: string | null;
   class_id: number | null;
 }
 
@@ -50,6 +53,7 @@ interface AssignmentInfo {
   subject_id: number;
   teacher_id: number | null;
   due_date: string | null;
+  total_marks: number | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -67,6 +71,9 @@ export default function TeacherAssignmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { settings } = useSettings();
+  
+  const isPast = (dateStr: string | null) => dateStr ? new Date(dateStr) < new Date() : false;
 
   // Edit/Delete state
   const [openModal, setOpenModal] = useState(false);
@@ -79,6 +86,7 @@ export default function TeacherAssignmentsPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
+  const [formTotalMarks, setFormTotalMarks] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -141,6 +149,7 @@ export default function TeacherAssignmentsPage() {
     setFormTitle("");
     setFormDesc("");
     setFormDueDate("");
+    setFormTotalMarks(settings.default_assignment_marks_scale || 30);
     setEditing(null);
     setMessage(null);
   };
@@ -151,7 +160,8 @@ export default function TeacherAssignmentsPage() {
     setFormSubjectId(a.subject_id);
     setFormTitle(a.title);
     setFormDesc(a.description || "");
-    setFormDueDate(a.due_date ? new Date(a.due_date).toISOString().split('T')[0] : "");
+    setFormDueDate(a.due_date ? new Date(a.due_date).toLocaleDateString('en-CA') : "");
+    setFormTotalMarks(a.total_marks || settings.default_assignment_marks_scale || 30);
     setOpenModal(true);
   };
 
@@ -169,7 +179,8 @@ export default function TeacherAssignmentsPage() {
         class_id: formClassId,
         subject_id: formSubjectId,
         teacher_id: teacher.id,
-        due_date: formDueDate ? `${formDueDate}T23:59:59` : null,
+        due_date: formDueDate ? new Date(`${formDueDate}T23:59:59`).toISOString() : null,
+        total_marks: formTotalMarks === "" ? null : Number(formTotalMarks),
       };
 
       if (editing) {
@@ -199,7 +210,7 @@ export default function TeacherAssignmentsPage() {
       const res = await api.get("/assignments/");
       setAssignments(res.data);
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to delete assignment");
+      toast.error(err?.response?.data?.detail || "Failed to delete assignment");
     } finally {
       setDeleting(false);
     }
@@ -302,16 +313,17 @@ export default function TeacherAssignmentsPage() {
                           {subjects.find((s) => s.id === a.subject_id)?.name || `#${a.subject_id}`}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {a.due_date ? new Date(a.due_date).toLocaleDateString() : "—"}
+                          {a.due_date ? formatDate(a.due_date) : "—"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {new Date(a.created_at).toLocaleDateString()}
+                          {formatDate(a.created_at)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex justify-end items-center gap-4">
                           <button
-                            onClick={() => openEditModal(a)}
-                            className="text-gray-500 hover:text-primary-600"
-                            title="Edit Assignment"
+                            onClick={() => !isPast(a.due_date) && openEditModal(a)}
+                            className={`text-gray-500 hover:text-primary-600 ${isPast(a.due_date) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={isPast(a.due_date) ? "Cannot edit — due date has passed" : "Edit Assignment"}
+                            disabled={isPast(a.due_date)}
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
@@ -352,7 +364,7 @@ export default function TeacherAssignmentsPage() {
                                       <li key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                         <div className="flex-1">
                                           <p className="text-sm font-medium text-gray-900 mb-1">
-                                            {student.first_name} {student.last_name}
+                                            {student.full_name || `Student #${student.id}`} {student.roll_number ? `(${student.roll_number})` : ""}
                                           </p>
                                           {submission ? (
                                             <div className="mt-2 text-sm text-gray-600 bg-gray-50 rounded p-3 border border-gray-100">
@@ -399,11 +411,12 @@ export default function TeacherAssignmentsPage() {
                                               <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-md border border-gray-200">
                                                 <input
                                                   type="number"
-                                                  step="0.1"
+                                                  step="1"
                                                   min="0"
+                                                  max={a.total_marks || 30}
                                                   value={gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "")}
                                                   onChange={(e) => setGradeInputs({ ...gradeInputs, [submission.id]: e.target.value })}
-                                                  placeholder="Score"
+                                                  placeholder={`/ ${a.total_marks || 30}`}
                                                   className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
                                                 />
                                                 <button
@@ -485,6 +498,16 @@ export default function TeacherAssignmentsPage() {
                 type="date"
                 value={formDueDate}
                 onChange={(e) => setFormDueDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Total Marks</label>
+              <input
+                type="number"
+                min="1"
+                value={formTotalMarks}
+                onChange={(e) => setFormTotalMarks(e.target.value ? Number(e.target.value) : "")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>

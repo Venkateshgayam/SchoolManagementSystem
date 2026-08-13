@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, TrendingUp } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import api from "@/lib/api";
+import { useSettings } from "@/hooks/useSettings";
+import { getLetterGrade, getGradeColor } from "@/lib/gradeUtils";
+import OverallResult, { OverallResultData } from "@/components/dashboard/OverallResult";
 
 interface GradeRecord {
   id: number;
@@ -21,15 +24,18 @@ interface SubjectInfo {
 
 interface ExamInfo {
   id: number;
-  name: string;
+  title: string;
 }
 
 export default function StudentGradesPage() {
   const [grades, setGrades] = useState<GradeRecord[]>([]);
   const [subjects, setSubjects] = useState<SubjectInfo[]>([]);
   const [exams, setExams] = useState<ExamInfo[]>([]);
+  const [overallResult, setOverallResult] = useState<OverallResultData | null>(null);
+  const [selectedExamId, setSelectedExamId] = useState<number | "">("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { settings } = useSettings();
 
   useEffect(() => {
     async function fetchGrades() {
@@ -38,7 +44,7 @@ export default function StudentGradesPage() {
           api.get("/grades/").catch(() => ({ data: [] })),
           api.get("/students/me").catch(() => ({ data: null })),
           api.get("/subjects/").catch(() => ({ data: [] })),
-          api.get("/exams/").catch(() => ({ data: [] })),
+          api.get("/exams/").catch(() => ({ data: [] }))
         ]);
 
         const student = studentRes.data;
@@ -46,6 +52,13 @@ export default function StudentGradesPage() {
         setGrades(studentGrades);
         setSubjects(subjectsRes.data);
         setExams(examsRes.data);
+        
+        const latestExamId = studentGrades.length > 0 
+          ? Math.max(...studentGrades.map((g: any) => g.exam_id).filter(Boolean)) 
+          : "";
+        if (latestExamId !== -Infinity && latestExamId) {
+          setSelectedExamId(latestExamId);
+        }
       } catch (err: any) {
         setError(err?.message || "Failed to load grades");
       } finally {
@@ -56,6 +69,16 @@ export default function StudentGradesPage() {
     fetchGrades();
   }, []);
 
+  useEffect(() => {
+    if (selectedExamId) {
+      api.get(`/results/student/me?exam_id=${selectedExamId}`)
+        .then(res => setOverallResult(res.data))
+        .catch(() => setOverallResult(null));
+    } else {
+      setOverallResult(null);
+    }
+  }, [selectedExamId]);
+
   const getSubjectName = (subjectId: number) => {
     const subject = subjects.find((s) => s.id === subjectId);
     return subject?.name || `Subject ${subjectId}`;
@@ -64,7 +87,7 @@ export default function StudentGradesPage() {
   const getExamName = (examId: number | null) => {
     if (!examId) return "N/A";
     const exam = exams.find((e) => e.id === examId);
-    return exam?.name || `Exam ${examId}`;
+    return exam?.title || `Exam ${examId}`;
   };
 
   if (loading) {
@@ -88,7 +111,27 @@ export default function StudentGradesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">My Grades</h1>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold text-gray-900">My Grades</h1>
+        <select
+          className="input-field w-full md:w-64 bg-white"
+          value={selectedExamId}
+          onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : "")}
+        >
+          <option value="">-- Select an Exam --</option>
+          {exams.map(ex => (
+            <option key={ex.id} value={ex.id}>{ex.title}</option>
+          ))}
+        </select>
+      </div>
+
+      {selectedExamId ? (
+        <OverallResult result={overallResult} />
+      ) : (
+        <div className="card mb-6 p-4">
+          <p className="text-gray-500 text-sm italic">Select an exam to view the overall result.</p>
+        </div>
+      )}
 
       {grades.length === 0 ? (
         <div className="card text-center py-8">
@@ -110,8 +153,10 @@ export default function StudentGradesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {grades.map((grade) => {
+                  // * 100 here is a mathematical percentage-conversion constant, not a configurable value
                   const pct = grade.percentage || (grade.total_marks > 0 ? (grade.marks_obtained / grade.total_marks) * 100 : 0);
-                  const letterGrade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
+                  // Use configured grading_scale from settings; falls back to default scale in gradeUtils
+                  const letterGrade = getLetterGrade(pct, settings.grading_scale);
                   return (
                     <tr key={grade.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -123,19 +168,7 @@ export default function StudentGradesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{pct.toFixed(1)}%</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            letterGrade === "A"
-                              ? "bg-green-100 text-green-800"
-                              : letterGrade === "B"
-                              ? "bg-blue-100 text-blue-800"
-                              : letterGrade === "C"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : letterGrade === "D"
-                              ? "bg-orange-100 text-orange-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getGradeColor(letterGrade)}`}>
                           {letterGrade}
                         </span>
                       </td>

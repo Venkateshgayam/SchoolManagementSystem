@@ -29,8 +29,11 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Don't attempt to refresh token if the login request itself failed
-      if (originalRequest.url?.includes("/auth/login")) {
+      // Don't attempt to refresh token if the login or refresh request itself failed
+      if (
+        originalRequest.url?.includes("/auth/login") ||
+        originalRequest.url?.includes("/auth/refresh-token")
+      ) {
         return Promise.reject(error);
       }
 
@@ -58,7 +61,10 @@ apiClient.interceptors.response.use(
           role = null;
         }
         localStorage.removeItem("user");
-        window.location.href = getLoginPath(role);
+        const currentPath = window.location.pathname;
+        if (!currentPath.startsWith('/login') && !currentPath.startsWith('/admin/login')) {
+          window.location.href = getLoginPath(role);
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

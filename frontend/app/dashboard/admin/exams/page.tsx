@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
+import toast from "react-hot-toast";
 
 interface ExamSubjectSlot {
   id?: number;
@@ -20,6 +21,7 @@ interface ExamRecord {
   name: string;
   exam_type: string | null;
   academic_year: string | null;
+  total_marks: number | null;
   slots: ExamSubjectSlot[];
 }
 
@@ -43,7 +45,10 @@ export default function AdminExamsPage() {
   const [formName, setFormName] = useState("");
   const [formExamType, setFormExamType] = useState("");
   const [formAcademicYear, setFormAcademicYear] = useState("");
+  const [formTotalMarks, setFormTotalMarks] = useState("");
   const [formSlots, setFormSlots] = useState<Partial<ExamSubjectSlot>[]>([]);
+  
+  const isPast = (slots: ExamSubjectSlot[]) => slots.length > 0 && slots.some(s => new Date(s.start_time) < new Date());
 
   const fetchData = async () => {
     try {
@@ -68,6 +73,7 @@ export default function AdminExamsPage() {
     setFormName("");
     setFormExamType("");
     setFormAcademicYear("");
+    setFormTotalMarks("");
     setFormSlots([]);
     setEditing(null);
   };
@@ -82,13 +88,19 @@ export default function AdminExamsPage() {
     setFormName(e.name);
     setFormExamType(e.exam_type || "");
     setFormAcademicYear(e.academic_year || "");
-    setFormSlots(e.slots.map(s => ({
-      id: s.id,
-      subject_id: s.subject_id,
-      date: new Date(s.date).toISOString().split('T')[0],
-      start_time: new Date(s.start_time).toISOString().substring(11, 16),
-      end_time: new Date(s.end_time).toISOString().substring(11, 16)
-    })));
+    setFormTotalMarks(e.total_marks ? String(e.total_marks) : "");
+    setFormSlots(e.slots.map(s => {
+      const dDate = new Date(s.date);
+      const dStart = new Date(s.start_time);
+      const dEnd = new Date(s.end_time);
+      return {
+        id: s.id,
+        subject_id: s.subject_id,
+        date: dDate.toLocaleDateString('en-CA'),
+        start_time: dStart.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        end_time: dEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      };
+    }));
     setOpen(true);
   };
 
@@ -108,31 +120,38 @@ export default function AdminExamsPage() {
 
   const handleSubmit = async () => {
     if (!formName) {
-      alert("Exam name is required.");
+      toast.error("Exam name is required.");
       return;
     }
     
     // Validate slots
     for (const slot of formSlots) {
       if (!slot.subject_id || !slot.date || !slot.start_time || !slot.end_time) {
-        alert("Please fill all fields for all subject slots.");
+        toast.error("Please fill all fields for all subject slots.");
         return;
       }
     }
 
     setSaving(true);
     try {
-      const slotsPayload = formSlots.map(s => ({
-        subject_id: Number(s.subject_id),
-        date: `${s.date}T00:00:00`,
-        start_time: `${s.date}T${s.start_time}:00`,
-        end_time: `${s.date}T${s.end_time}:00`,
-      }));
+      const slotsPayload = formSlots.map(s => {
+        const start = new Date(`${s.date}T${s.start_time}:00`);
+        const end = new Date(`${s.date}T${s.end_time}:00`);
+        const dateOnly = new Date(`${s.date}T00:00:00`);
+        
+        return {
+          subject_id: Number(s.subject_id),
+          date: dateOnly.toISOString(),
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+        };
+      });
 
       const payload = {
         name: formName,
         exam_type: formExamType || null,
         academic_year: formAcademicYear || null,
+        total_marks: formTotalMarks ? Number(formTotalMarks) : null,
         slots: slotsPayload
       };
 
@@ -145,7 +164,7 @@ export default function AdminExamsPage() {
       resetForm();
       await fetchData();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to save exam");
+      toast.error(err?.response?.data?.detail || "Failed to save exam");
     } finally {
       setSaving(false);
     }
@@ -159,7 +178,7 @@ export default function AdminExamsPage() {
       setDeleteTarget(null);
       await fetchData();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Failed to delete exam");
+      toast.error(err?.response?.data?.detail || "Failed to delete exam");
     } finally {
       setDeleting(false);
     }
@@ -220,7 +239,12 @@ export default function AdminExamsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Award className="h-4 w-4 inline mr-1 text-gray-400" />{e.academic_year || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <button onClick={() => openEdit(e)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
+                      <button
+                        onClick={() => !isPast(e.slots) && openEdit(e)}
+                        className={`text-gray-500 hover:text-primary-600 mr-3 ${isPast(e.slots) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={isPast(e.slots) ? "Cannot edit — exam date has passed or started" : "Edit"}
+                        disabled={isPast(e.slots)}
+                      >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button onClick={() => setDeleteTarget(e)} className="text-gray-500 hover:text-red-600" title="Delete">
@@ -266,6 +290,16 @@ export default function AdminExamsPage() {
                 value={formAcademicYear}
                 onChange={(e) => setFormAcademicYear(e.target.value)}
                 placeholder="e.g. 2025-2026"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Total Marks</label>
+              <input
+                type="number"
+                value={formTotalMarks}
+                onChange={(e) => setFormTotalMarks(e.target.value)}
+                placeholder="e.g. 100"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>

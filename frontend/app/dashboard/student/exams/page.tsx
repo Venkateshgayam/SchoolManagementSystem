@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { AlertCircle, Calendar, Clock, CheckCircle, Send, Paperclip, X, FileText, XCircle } from "lucide-react";
@@ -53,7 +54,7 @@ export default function StudentExamsPage() {
       try {
         const [examsRes, subsRes, subjsRes] = await Promise.all([
           api.get("/exams/"),
-          api.get("/exam-submissions").catch(() => ({ data: [] })),
+          api.get("/exam-submissions/").catch(() => ({ data: [] })),
           api.get("/subjects/").catch(() => ({ data: [] }))
         ]);
         setExams(examsRes.data);
@@ -106,10 +107,10 @@ export default function StudentExamsPage() {
         formData.append("file", submitFile[slotId] as Blob);
       }
 
-      await api.post("/exam-submissions", formData, {
+      await api.post("/exam-submissions/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const res = await api.get("/exam-submissions");
+      const res = await api.get("/exam-submissions/");
       setSubmissions(res.data);
       setSubmitText((prev) => ({ ...prev, [slotId]: "" }));
       setSubmitFile((prev) => ({ ...prev, [slotId]: null }));
@@ -170,7 +171,7 @@ export default function StudentExamsPage() {
                       
                       <div className="flex flex-col sm:flex-row gap-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
                         <p className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Calendar className="h-4 w-4 text-gray-400" /> {new Date(slot.date).toLocaleDateString()}
+                          <Calendar className="h-4 w-4 text-gray-400" /> {formatDate(slot.date)}
                         </p>
                         <p className="flex items-center gap-2 text-gray-700 font-medium">
                           <Clock className="h-4 w-4 text-gray-400" /> 
@@ -184,7 +185,7 @@ export default function StudentExamsPage() {
                   <div className="mt-5 pt-5 border-t border-gray-200">
                     {new Date() < new Date(slot.start_time + "Z") ? (
                       <div className="bg-yellow-50 text-yellow-800 p-4 rounded-md text-sm font-medium border border-yellow-200">
-                        This exam opens at {new Date(slot.start_time + "Z").toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} on {new Date(slot.start_time + "Z").toLocaleDateString()}.
+                        This exam opens at {new Date(slot.start_time + "Z").toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} on {formatDate(slot.start_time + "Z")}.
                       </div>
                     ) : (
                       <>
@@ -279,7 +280,7 @@ export default function StudentExamsPage() {
                         <h3 className={`font-bold ${isMissed ? 'text-gray-600' : 'text-gray-900'}`}>{slot.exam.name} - {getSubjectName(slot.subject_id)}</h3>
                       </div>
                       <p className="text-sm text-gray-500 mb-2">
-                        {new Date(slot.date).toLocaleDateString()} | {new Date(slot.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(slot.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {formatDate(slot.date)} | {new Date(slot.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(slot.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </p>
                     </div>
                     <div>

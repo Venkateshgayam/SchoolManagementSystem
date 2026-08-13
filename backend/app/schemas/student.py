@@ -25,6 +25,7 @@ class StudentUpdate(BaseModel):
     class_id: Optional[int] = None
     parent_email: Optional[str] = Field(None, max_length=255)
     status: Optional[str] = Field(None, max_length=20)
+    enrollment_date: Optional[datetime] = None
 
 
 class StudentResponse(BaseModel):

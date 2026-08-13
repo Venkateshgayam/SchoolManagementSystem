@@ -1,13 +1,19 @@
 "use client";
 
+import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
 import { FileText, DollarSign, Calendar, CheckCircle, Clock } from "lucide-react";
 import api from "@/lib/api";
 
+import { useSettings } from "@/hooks/useSettings";
+
 interface FeeRecord {
   id: number;
   student_id: number;
-  amount: number;
+  total_fee: number;
+  amount_paid: number;
+  amount_due: number;
+  late_fee_applied?: number;
   due_date: string | null;
   paid_date: string | null;
   status: string;
@@ -18,6 +24,10 @@ export default function StudentFeesPage() {
   const [fees, setFees] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const { settings } = useSettings();
+  const currencySymbol = settings.currency_symbol || "$";
+  const formatCurrency = (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   useEffect(() => {
     async function fetchFees() {
@@ -34,10 +44,10 @@ export default function StudentFeesPage() {
     fetchFees();
   }, []);
 
-  const totalFees = fees.reduce((sum, f) => sum + f.amount, 0);
-  const paidFees = fees.filter((f) => f.status === "paid").reduce((sum, f) => sum + f.amount, 0);
-  const pendingFees = fees.filter((f) => f.status === "pending");
-  const overdueFees = fees.filter((f) => f.status === "overdue");
+  const totalFees = fees.reduce((sum, f) => sum + (f.total_fee || 0), 0);
+  const paidFees = fees.reduce((sum, f) => sum + (f.amount_paid || 0), 0);
+  const pendingFees = fees.filter((f) => f.status === "PENDING" || f.status === "PARTIAL");
+  const overdueFees = fees.filter((f) => f.status === "OVERDUE" || (f.amount_due > 0 && f.due_date && new Date(f.due_date) < new Date()));
 
   if (loading) {
     return (
@@ -66,19 +76,19 @@ export default function StudentFeesPage() {
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Total Fees</p>
           <p className="mt-2 text-3xl font-bold text-gray-900 flex items-center justify-center gap-2">
-            <DollarSign className="h-7 w-7" /> {totalFees.toFixed(2)}
+            {formatCurrency(totalFees)}
           </p>
         </div>
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Paid</p>
           <p className="mt-2 text-3xl font-bold text-green-600 flex items-center justify-center gap-2">
-            <DollarSign className="h-7 w-7" /> {paidFees.toFixed(2)}
+            {formatCurrency(paidFees)}
           </p>
         </div>
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Outstanding</p>
           <p className="mt-2 text-3xl font-bold text-red-600">
-            ₹{(totalFees - paidFees).toFixed(2)}
+            {formatCurrency(totalFees - paidFees)}
           </p>
         </div>
       </div>
@@ -93,7 +103,7 @@ export default function StudentFeesPage() {
                   <p className="font-medium text-gray-900">Fee #{fee.id}</p>
                   <p className="text-sm text-gray-500">
                     {fee.academic_year && `${fee.academic_year} · `}
-                    Due: {fee.due_date ? new Date(fee.due_date).toLocaleDateString() : "N/A"}
+                    Due: {fee.due_date ? formatDate(fee.due_date) : "N/A"}
                   </p>
                 </div>
                 <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
@@ -115,7 +125,7 @@ export default function StudentFeesPage() {
                   <p className="font-medium text-gray-900">Fee #{fee.id}</p>
                   <p className="text-sm text-gray-500">
                     {fee.academic_year && `${fee.academic_year} · `}
-                    Due: {fee.due_date ? new Date(fee.due_date).toLocaleDateString() : "N/A"}
+                    Due: {fee.due_date ? formatDate(fee.due_date) : "N/A"}
                   </p>
                 </div>
                 <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
@@ -137,7 +147,8 @@ export default function StudentFeesPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Fee</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount Due</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Academic Year</th>
@@ -147,16 +158,20 @@ export default function StudentFeesPage() {
                 {fees.map((fee) => (
                   <tr key={fee.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{fee.id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{fee.amount.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(fee.total_fee)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(fee.amount_due)}
+                      {fee.late_fee_applied && fee.late_fee_applied > 0 ? <div className="text-xs text-red-500">Includes {formatCurrency(fee.late_fee_applied)} late fee</div> : null}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {fee.due_date ? new Date(fee.due_date).toLocaleDateString() : "N/A"}
+                      {fee.due_date ? formatDate(fee.due_date) : "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          fee.status === "paid"
+                          fee.status === "PAID"
                             ? "bg-green-100 text-green-800"
-                            : fee.status === "overdue"
+                            : fee.status === "OVERDUE"
                             ? "bg-red-100 text-red-800"
                             : "bg-yellow-100 text-yellow-800"
                         }`}

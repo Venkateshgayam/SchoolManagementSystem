@@ -71,9 +71,9 @@ export default function TeacherLeaveRequestsPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "approved":
+      case "APPROVED":
         return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case "rejected":
+      case "REJECTED":
         return <XCircle className="h-5 w-5 text-red-600" />;
       default:
         return <Clock className="h-5 w-5 text-yellow-600" />;
@@ -82,9 +82,9 @@ export default function TeacherLeaveRequestsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "approved":
+      case "APPROVED":
         return "bg-green-100 text-green-800";
-      case "rejected":
+      case "REJECTED":
         return "bg-red-100 text-red-800";
       default:
         return "bg-yellow-100 text-yellow-800";

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
 import { Megaphone, Pin, Calendar, Trash2 } from "lucide-react";
 import api from "@/lib/api";
@@ -7,10 +8,11 @@ import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
+import toast from "react-hot-toast";
 
 interface AnnouncementRecord { id: number; title: string; content: string; created_by: number | null; target_role: string | null; created_at: string; expires_at: string | null; is_pinned: boolean; }
 
-const TARGET_ROLES = ["all", "student", "teacher", "management", "admin", "super_admin"];
+const TARGET_ROLES = ["all", "student", "teacher", "admin"];
 
 export default function AdminAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
@@ -32,7 +34,7 @@ export default function AdminAnnouncementsPage() {
 
   const togglePin = async (a: AnnouncementRecord) => {
     try { await api.put(`/announcements/${a.id}`, { is_pinned: !a.is_pinned }); setAnnouncements((p) => p.map((x) => x.id === a.id ? { ...x, is_pinned: !x.is_pinned } : x)); }
-    catch (err: any) { alert(err?.response?.data?.detail || err?.message || "Could not update"); }
+    catch (err: any) { toast.error(err?.response?.data?.detail || err?.message || "Could not update"); }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -43,7 +45,7 @@ export default function AdminAnnouncementsPage() {
       setModalOpen(false);
       setForm({ title: "", content: "", target_role: "all", expires_at: "", is_pinned: false });
       await load();
-    } catch (err: any) { alert(err?.response?.data?.detail || err?.message || "Could not create announcement"); }
+    } catch (err: any) { toast.error(err?.response?.data?.detail || err?.message || "Could not create announcement"); }
     finally { setSaving(false); }
   };
 
@@ -54,7 +56,7 @@ export default function AdminAnnouncementsPage() {
       await api.delete(`/announcements/${deleting.id}`);
       setAnnouncements((p) => p.filter((a) => a.id !== deleting.id));
       setDeleting(null);
-    } catch (err: any) { alert(err?.response?.data?.detail || err?.message || "Could not delete announcement"); }
+    } catch (err: any) { toast.error(err?.response?.data?.detail || err?.message || "Could not delete announcement"); }
     finally { setDeleteLoading(false); }
   };
 
@@ -94,8 +96,8 @@ export default function AdminAnnouncementsPage() {
                     <td className="px-6 py-4 whitespace-nowrap">{a.is_pinned ? <Pin className="h-4 w-4 text-yellow-500" /> : <span className="h-4 w-4 inline-block" />}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{a.title}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{a.target_role || "all"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{new Date(a.created_at).toLocaleDateString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{a.expires_at ? new Date(a.expires_at).toLocaleDateString() : "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{formatDate(a.created_at)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{a.expires_at ? formatDate(a.expires_at) : "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right space-x-3">
                       <button onClick={() => togglePin(a)} className="text-xs text-blue-600 hover:text-blue-800">{a.is_pinned ? "Unpin" : "Pin"}</button>
                       <button onClick={() => setDeleting(a)} className="text-xs text-red-600 hover:text-red-800 flex items-center gap-0.5"><Trash2 className="h-3 w-3" />Delete</button>
@@ -114,21 +116,21 @@ export default function AdminAnnouncementsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-              <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={255} className="input" />
+              <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={255} className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Target</label>
-              <select value={form.target_role} onChange={(e) => setForm({ ...form, target_role: e.target.value })} className="input">
+              <select value={form.target_role} onChange={(e) => setForm({ ...form, target_role: e.target.value })} className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white">
                 {TARGET_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-              <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} required className="input" rows={3} />
+              <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} required className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white" rows={3} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Expires At</label>
-              <input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} className="input" />
+              <input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} className="w-full px-3 py-2 border border-solid border-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors bg-white" />
             </div>
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm({ ...form, is_pinned: e.target.checked })} /> Pinned</label>

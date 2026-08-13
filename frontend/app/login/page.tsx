@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useAuthGate } from "@/hooks/useAuthGate";
-import { GraduationCap, UserCheck, Building2, ChevronRight } from "lucide-react";
+import { useSettings } from "@/hooks/useSettings";
+import { GraduationCap, UserCheck, Shield, ChevronRight } from "lucide-react";
 
 const portals = [
   {
@@ -22,17 +23,20 @@ const portals = [
     color: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200",
   },
   {
-    role: "management",
-    href: "/login/management",
-    label: "Management",
+    role: "admin",
+    href: "/admin/login",
+    label: "Admin",
     description: "Oversee school operations, reports, and analytics",
-    icon: Building2,
+    icon: Shield,
     color: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200",
   },
 ];
 
 export default function LoginPortalPage() {
   const gate = useAuthGate();
+  const { settings } = useSettings();
+  const schoolName = settings.school_name || "School Management";
+  const schoolInitials = schoolName.split(" ").map((w: string) => w[0]).join("").substring(0, 3).toUpperCase() || "SMS";
 
   if (gate !== "guest") {
     return (
@@ -48,8 +52,8 @@ export default function LoginPortalPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 sm:p-10">
           <div className="flex flex-col items-center mb-8">
             <div className="flex items-center gap-2 mb-5">
-              <div className="bg-primary-600 text-white font-bold text-xl px-3 py-1 rounded-lg">SMS</div>
-              <span className="text-lg font-semibold text-gray-900 hidden sm:block">School Management</span>
+              <div className="bg-primary-600 text-white font-bold text-xl px-3 py-1 rounded-lg">{schoolInitials}</div>
+              <span className="text-lg font-semibold text-gray-900 hidden sm:block">{schoolName}</span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 text-center">Select Your Portal</h2>
             <p className="mt-1 text-sm text-gray-500 text-center">

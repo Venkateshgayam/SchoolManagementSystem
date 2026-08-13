@@ -6,22 +6,33 @@ import api from "@/lib/api";
 
 interface CurriculumRecord {
   id: number;
-  name: string;
+  class_id: number;
+  subject_id: number;
   description: string | null;
-  grade_level: string | null;
+  teaching_hours: number | null;
   created_at: string;
+}
+
+interface SubjectRecord {
+  id: number;
+  name: string;
 }
 
 export default function StudentCurriculumPage() {
   const [curriculum, setCurriculum] = useState<CurriculumRecord[]>([]);
+  const [subjects, setSubjects] = useState<SubjectRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchCurriculum() {
       try {
-        const res = await api.get("/curriculum/");
-        setCurriculum(res.data);
+        const [cRes, sRes] = await Promise.all([
+          api.get("/curriculum/"),
+          api.get("/subjects/").catch(() => ({ data: [] }))
+        ]);
+        setCurriculum(cRes.data);
+        setSubjects(sRes.data);
       } catch (err: any) {
         setError(err?.message || "Failed to load curriculum");
       } finally {
@@ -64,12 +75,14 @@ export default function StudentCurriculumPage() {
         <div className="space-y-4">
           {curriculum.map((item) => (
             <div key={item.id} className="card">
-              <h3 className="font-semibold text-gray-900">{item.name}</h3>
+              <h3 className="font-semibold text-gray-900">
+                {subjects.find(s => s.id === item.subject_id)?.name || `Subject #${item.subject_id}`} Curriculum
+              </h3>
               {item.description && (
                 <p className="text-sm text-gray-600 mt-1">{item.description}</p>
               )}
-              {item.grade_level && (
-                <p className="text-xs text-gray-400 mt-1">Grade: {item.grade_level}</p>
+              {item.teaching_hours !== null && (
+                <p className="text-xs text-gray-400 mt-1">Teaching Hours: {item.teaching_hours}</p>
               )}
             </div>
           ))}

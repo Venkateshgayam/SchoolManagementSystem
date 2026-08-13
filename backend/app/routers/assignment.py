@@ -7,10 +7,26 @@ from app.models.assignment import Assignment
 from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.class_model import Class
+from app.models.notification import Notification
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentResponse
 from app.core.dependencies import require_role, get_current_active_user, get_current_student
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
+
+async def _notify_class_students(db: AsyncSession, class_id: int, title: str, message: str, notif_type: str):
+    result = await db.execute(select(Student).where(Student.class_id == class_id))
+    students = result.scalars().all()
+    notifications = []
+    for s in students:
+        if s.user_id:
+            notifications.append(Notification(
+                user_id=s.user_id,
+                title=title,
+                message=message,
+                type=notif_type
+            ))
+    if notifications:
+        db.add_all(notifications)
 
 
 async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
@@ -25,9 +41,8 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
 
 @router.get("/", response_model=List[AssignmentResponse])
 async def list_assignments(
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     role = current_user.get("role")
     if role == "student":
         student = await get_current_student(current_user=current_user, db=db)
@@ -46,9 +61,8 @@ async def list_assignments(
 @router.get("/{assignment_id}", response_model=AssignmentResponse)
 async def get_assignment(
     assignment_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Assignment).where(Assignment.id == assignment_id))
     assignment = result.scalar_one_or_none()
     if not assignment:
@@ -68,11 +82,26 @@ async def get_assignment(
 @router.post("/", response_model=AssignmentResponse)
 async def create_assignment(
     request: AssignmentCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
+    
+    if current_user.get("role") == "teacher":
+        class_ids = await _teacher_class_ids(db, current_user)
+        if request.class_id not in class_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot create assignment for a class you do not teach")
+            
     assignment = Assignment(**request.model_dump(exclude_unset=True))
     db.add(assignment)
+    
+    if assignment.class_id:
+        await _notify_class_students(
+            db, 
+            assignment.class_id, 
+            "New Assignment", 
+            f"A new assignment '{assignment.title}' has been created.",
+            "assignment_created"
+        )
+        
     await db.commit()
     await db.refresh(assignment)
     return assignment
@@ -82,16 +111,31 @@ async def create_assignment(
 async def update_assignment(
     assignment_id: int,
     request: AssignmentUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Assignment).where(Assignment.id == assignment_id))
     assignment = result.scalar_one_or_none()
     if not assignment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+        
+    if current_user.get("role") == "teacher":
+        class_ids = await _teacher_class_ids(db, current_user)
+        if assignment.class_id not in class_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify assignment for a class you do not teach")
+            
     update_data = request.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(assignment, key, value)
+        
+    if assignment.class_id:
+        await _notify_class_students(
+            db,
+            assignment.class_id,
+            "Assignment Updated",
+            f"The assignment '{assignment.title}' has been updated.",
+            "assignment_updated"
+        )
+        
     await db.commit()
     await db.refresh(assignment)
     return assignment
@@ -100,12 +144,21 @@ async def update_assignment(
 @router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_assignment(
     assignment_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Assignment).where(Assignment.id == assignment_id))
     assignment = result.scalar_one_or_none()
     if not assignment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+        
+    if assignment.class_id:
+        await _notify_class_students(
+            db,
+            assignment.class_id,
+            "Assignment Deleted",
+            f"The assignment '{assignment.title}' has been deleted.",
+            "assignment_deleted"
+        )
+        
     await db.delete(assignment)
     await db.commit()

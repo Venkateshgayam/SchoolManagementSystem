@@ -25,11 +25,10 @@ from app.routers import (
     user_router,
     audit_log_router,
     system_setting_router,
-    
-    # reports
-    reports_router,
+
     exam_submission_router,
     assignment_submission_router,
+    result_router,
 )
 
 from fastapi.staticfiles import StaticFiles
@@ -73,9 +72,10 @@ app.include_router(notification_router, prefix="/api", tags=["notifications"])
 app.include_router(document_router, prefix="/api", tags=["documents"])
 app.include_router(user_router, prefix="/api", tags=["users"])
 app.include_router(audit_log_router, prefix="/api", tags=["audit_logs"])
-app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
+
 app.include_router(exam_submission_router, prefix="/api", tags=["exam_submissions"])
 app.include_router(assignment_submission_router, prefix="/api", tags=["assignment_submissions"])
+app.include_router(result_router, prefix="/api", tags=["results"])
 
 
 @app.on_event("startup")

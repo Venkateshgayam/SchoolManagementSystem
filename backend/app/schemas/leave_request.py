@@ -27,6 +27,7 @@ class LeaveRequestResponse(BaseModel):
     from_date: date
     to_date: date
     reason: Optional[str] = None
+    exceeds_limit: bool = False
     status: str
     approved_by: Optional[int] = None
     remarks: Optional[str] = None

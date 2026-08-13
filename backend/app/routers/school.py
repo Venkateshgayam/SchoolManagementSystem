@@ -13,9 +13,8 @@ router = APIRouter(prefix="/schools", tags=["schools"])
 
 @router.get("/", response_model=List[SchoolResponse])
 async def list_schools(
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(School).where(School.is_active == True))
     schools = result.scalars().all()
     return schools
@@ -24,9 +23,8 @@ async def list_schools(
 @router.get("/{school_id}", response_model=SchoolResponse)
 async def get_school(
     school_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(School).where(School.id == school_id))
     school = result.scalar_one_or_none()
     if not school:
@@ -37,9 +35,8 @@ async def get_school(
 @router.post("/", response_model=SchoolResponse)
 async def create_school(
     request: SchoolCreate,
-    current_user: dict = Depends(require_role("super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     school = School(**request.model_dump(exclude_unset=True))
     db.add(school)
     await db.commit()
@@ -51,9 +48,8 @@ async def create_school(
 async def update_school(
     school_id: int,
     request: SchoolUpdate,
-    current_user: dict = Depends(require_role("super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(School).where(School.id == school_id))
     school = result.scalar_one_or_none()
     if not school:
@@ -69,9 +65,8 @@ async def update_school(
 @router.delete("/{school_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_school(
     school_id: int,
-    current_user: dict = Depends(require_role("super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(School).where(School.id == school_id))
     school = result.scalar_one_or_none()
     if not school:

@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from sqlalchemy import Integer, ForeignKey, String, Text, Date, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base
@@ -13,7 +13,7 @@ class AcademicCalendar(Base):
     event_date: Mapped[date] = mapped_column(Date, nullable=False)
     event_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     school_id: Mapped[int | None] = mapped_column(ForeignKey("schools.id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     school = relationship("School", backref="calendar_events")
 

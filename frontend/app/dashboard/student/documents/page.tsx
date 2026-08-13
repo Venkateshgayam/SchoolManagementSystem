@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { Folder, FileText, Download } from "lucide-react";
@@ -90,7 +91,7 @@ export default function StudentDocumentsPage() {
                 <p className="text-sm text-gray-400">No file attached</p>
               )}
               <p className="mt-2 text-xs text-gray-400">
-                {new Date(doc.created_at).toLocaleDateString()}
+                {formatDate(doc.created_at)}
               </p>
             </div>
           ))}

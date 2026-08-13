@@ -5,6 +5,7 @@ import { BookOpen, Plus, Save, Search, FileText, Tag, Pencil, Trash2 } from "luc
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
+import PageLoader from "@/components/dashboard/PageLoader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import { can } from "@/lib/permissions";
@@ -138,7 +139,7 @@ export default function SubjectsManager() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading subjects…</div></div>;
+    return <PageLoader label="Loading..." />;
   }
   if (error) {
     return (
@@ -276,6 +277,7 @@ export default function SubjectsManager() {
                 setAssignOpen(false);
                 setSelectedTeacher(null);
                 setAssignTarget(null);
+                await fetchData();
               } catch (err: any) {
                 toast.error(err?.response?.data?.detail || "Failed to assign teacher");
               } finally { setAssigning(false); }

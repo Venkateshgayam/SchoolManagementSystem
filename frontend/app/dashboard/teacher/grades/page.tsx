@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { BookOpen, GraduationCap, Save, PlusCircle } from "lucide-react";
 import api from "@/lib/api";
+import { useSettings } from "@/hooks/useSettings";
 
 interface TeacherInfo {
   id: number;
@@ -26,6 +27,7 @@ interface StudentInfo {
   id: number;
   roll_number: string | null;
   class_id: number | null;
+  full_name?: string;
 }
 
 interface GradeRecord {
@@ -72,6 +74,13 @@ export default function TeacherGradesPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const { settings } = useSettings();
+
+  useEffect(() => {
+    if (settings.default_exam_marks_scale && totalMarks === "100") {
+      setTotalMarks(String(settings.default_exam_marks_scale));
+    }
+  }, [settings.default_exam_marks_scale]);
 
   useEffect(() => {
     async function fetchAll() {
@@ -355,13 +364,16 @@ export default function TeacherGradesPage() {
                   const ms = Number(totalMarks);
                   return (
                     <tr key={s.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{s.roll_number || "N/A"}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{s.full_name || `Student #${s.id}`}</div>
+                        <div className="text-xs text-gray-500">Roll No: {s.roll_number || "N/A"}</div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="number"
                           min="0"
                           max={ms}
-                          step="0.1"
+                          step="1"
                           value={scores[s.id] ?? (ex ? String(ex.marks_obtained) : "")}
                           onChange={(e) =>
                             setScores((prev) => ({ ...prev, [s.id]: e.target.value }))
@@ -407,7 +419,7 @@ export default function TeacherGradesPage() {
                     .slice(0, 10)
                     .map((g) => (
                       <tr key={g.id}>
-                        <td className="px-4 py-2 text-gray-700">{g.student_id}</td>
+                        <td className="px-4 py-2 text-gray-700">{students.find(s => s.id === g.student_id)?.full_name || `#${g.student_id}`}</td>
                         <td className="px-4 py-2 text-gray-700">{subjects.find((s) => s.id === g.subject_id)?.name || `#${g.subject_id}`}</td>
                         <td className="px-4 py-2 text-gray-700">{classes.find((c) => c.id === students.find(st => st.id === g.student_id)?.class_id)?.name || "—"}</td>
                         <td className="px-4 py-2 text-gray-700">{g.exam_id ? exams.find((e) => e.id === g.exam_id)?.title : "General"}</td>

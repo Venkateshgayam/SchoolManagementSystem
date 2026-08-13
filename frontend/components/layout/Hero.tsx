@@ -1,16 +1,19 @@
 "use client";
 
 import Image from "next/image";
+import { useSettings } from "@/hooks/useSettings";
 
 export default function Hero() {
+  const { settings } = useSettings();
+  const schoolName = settings.school_name || "School Management System";
+
   return (
     <section className="relative bg-gradient-to-br from-primary-700 to-primary-900 text-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
         <div className="lg:grid lg:grid-cols-2 lg:gap-12 items-center">
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-              School Management
-              <span className="text-primary-200"> System</span>
+              {schoolName}
             </h1>
             <p className="mt-6 text-lg text-primary-100 max-w-3xl">
               A modern, comprehensive platform for managing your school&apos;s operations �?" from student

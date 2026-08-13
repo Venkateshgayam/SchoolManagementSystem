@@ -1,14 +1,16 @@
 "use client";
 
+import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
 import { BookOpen, BarChart3, Pencil, Plus } from "lucide-react";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
 import Modal from "@/components/dashboard/Modal";
+import toast from "react-hot-toast";
 
 interface GradeRecord { id: number; student_id: number; subject_id: number; exam_id: number | null; marks_obtained: number; total_marks: number; percentage: number | null; created_at: string; }
-interface StudentRecord { id: number; roll_number: string | null; user_id: number; }
+interface StudentRecord { id: number; roll_number: string | null; user_id: number; full_name?: string; }
 interface SubjectRecord { id: number; name: string; }
 interface ExamRecord { id: number; name: string; }
 
@@ -45,7 +47,7 @@ export default function AdminGradesPage() {
 
   const studentLabel = (id: number) => {
     const s = students.find((st) => st.id === id);
-    return s?.roll_number ? `#${s.roll_number}` : `#${id}`;
+    return s?.full_name ? `${s.full_name} (${s.roll_number || 'N/A'})` : (s?.roll_number ? `#${s.roll_number}` : `#${id}`);
   };
   const subjectLabel = (id: number) => subjects.find((s) => s.id === id)?.name || `#${id}`;
   const examLabel = (id: number | null) => (id ? exams.find((e) => e.id === id)?.name || `#${id}` : "—");
@@ -78,7 +80,7 @@ export default function AdminGradesPage() {
       }
       setModalOpen(false);
       await load();
-    } catch (err: any) { alert(err?.response?.data?.detail || err?.message || "Could not save grade"); }
+    } catch (err: any) { toast.error(err?.response?.data?.detail || err?.message || "Could not save grade"); }
     finally { setSaving(false); }
   };
 
@@ -119,7 +121,7 @@ export default function AdminGradesPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{examLabel(g.exam_id)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{g.marks_obtained} / {g.total_marks}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{g.percentage ?? "—"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(g.created_at).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(g.created_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right"><button onClick={() => openEdit(g)} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"><Pencil className="h-3 w-3" /> Edit</button></td>
                   </tr>
                 ))}
@@ -136,7 +138,7 @@ export default function AdminGradesPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
             <select value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} required disabled={!!editing} className="input">
               <option value="">Select student</option>
-              {students.map((s) => <option key={s.id} value={s.id}>#{s.roll_number || s.id}</option>)}
+              {students.map((s) => <option key={s.id} value={s.id}>{s.full_name || `#${s.roll_number || s.id}`}</option>)}
             </select>
           </div>
           <div>
@@ -156,11 +158,11 @@ export default function AdminGradesPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Marks Obtained</label>
-              <input type="number" step="any" min={0} value={form.marks_obtained} onChange={(e) => setForm({ ...form, marks_obtained: e.target.value })} required className="input" />
+              <input type="number" step="1" min={0} max={form.total_marks || undefined} value={form.marks_obtained} onChange={(e) => setForm({ ...form, marks_obtained: e.target.value })} required className="input" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Total Marks</label>
-              <input type="number" step="any" min={0} value={form.total_marks} onChange={(e) => setForm({ ...form, total_marks: e.target.value })} required className="input" />
+              <input type="number" step="1" min={0} value={form.total_marks} onChange={(e) => setForm({ ...form, total_marks: e.target.value })} required className="input" />
             </div>
           </div>
           <div className="flex justify-end gap-2">

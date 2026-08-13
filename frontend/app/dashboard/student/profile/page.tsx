@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { User, Mail, Phone, BookOpen, Calendar, MapPin } from "lucide-react";
@@ -132,7 +133,7 @@ export default function StudentProfilePage() {
           <div>
             <p className="text-sm font-medium text-gray-500">Enrollment Date</p>
             <p className="text-gray-900 flex items-center gap-2">
-              <Calendar className="h-4 w-4" /> {new Date(student.enrollment_date).toLocaleDateString()}
+              <Calendar className="h-4 w-4" /> {formatDate(student.enrollment_date)}
             </p>
           </div>
           <div>

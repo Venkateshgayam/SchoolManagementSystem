@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { Calendar, Users, Save, ClipboardList } from "lucide-react";
@@ -21,6 +22,7 @@ interface StudentInfo {
   roll_number: string | null;
   class_id: number | null;
   status: string;
+  full_name?: string;
 }
 
 interface AttendanceRecord {
@@ -61,7 +63,7 @@ export default function TeacherAttendancePage() {
         setStudents(studentsRes.data);
         setAttendance(attendanceRes.data);
 
-        const today = new Date().toISOString().split("T")[0];
+        const today = new Date().toLocaleDateString('en-CA');
         setSelectedDate(today);
       } catch (err: any) {
         setError(err?.message || "Failed to load attendance");
@@ -256,7 +258,10 @@ export default function TeacherAttendancePage() {
                   const status = statuses[s.id] ?? defaultStatus;
                   return (
                     <tr key={s.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{s.roll_number || "N/A"}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{s.full_name || `Student #${s.id}`}</div>
+                        <div className="text-xs text-gray-500">Roll No: {s.roll_number || "N/A"}</div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <select
                           value={status}
@@ -294,7 +299,7 @@ export default function TeacherAttendancePage() {
                 <div key={a.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
                     <p className="font-medium text-gray-900">
-                      Student {a.student_id} — {new Date(a.date).toLocaleDateString()}
+                      {students.find(s => s.id === a.student_id)?.full_name || `Student #${a.student_id}`} — {formatDate(a.date)}
                     </p>
                   </div>
                   <span

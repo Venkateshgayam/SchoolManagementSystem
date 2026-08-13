@@ -63,21 +63,13 @@ Development seed data is created automatically when the backend starts with the 
 | `/` | Home page |
 | `/about` | About page |
 | `/contact` | Contact page |
-| `/login` | Public login (Student, Teacher, Management) |
+| `/login` | Public login (Student, Teacher) |
 
 ### Private Admin Pages
 
 | URL | Description |
 |-----|-------------|
 | `/admin/login` | Admin login |
-| `/dashboard/admin` | Admin dashboard |
-
-### Private Super Admin Pages
-
-| URL | Description |
-|-----|-------------|
-| `/super-admin/login` | Super Admin login |
-| `/dashboard/super-admin` | Super Admin dashboard |
 
 ### Dashboard Routes
 
@@ -85,24 +77,20 @@ Development seed data is created automatically when the backend starts with the 
 |------|--------------|
 | Student | `/dashboard/student` |
 | Teacher | `/dashboard/teacher` |
-| Management | `/dashboard/management` |
 | Admin | `/dashboard/admin` |
-| Super Admin | `/dashboard/super-admin` |
 
 ## Development Credentials
 
 The seed script creates the following development accounts:
 
-- **Super Admin**: superadmin@school.edu / SuperAdmin123!
-- **Admin**: admin@school.edu / Admin123!
-- **Management**: management@school.edu / Management123!
-- **Teacher**: teacher1@school.edu / Teacher123!
-- **Teacher**: teacher2@school.edu / Teacher123!
-- **Student**: student1@school.edu / Student123!
-- **Student**: student2@school.edu / Student123!
-- **Student**: student3@school.edu / Student123!
-- **Student**: student4@school.edu / Student123!
-- **Student**: student5@school.edu / Student123!
+- **Admin**: admin@school.edu / password
+- **Teacher**: teacher1@school.edu / password
+- **Teacher**: teacher2@school.edu / password
+- **Student**: student1@school.edu / password
+- **Student**: student2@school.edu / password
+- **Student**: student3@school.edu / password
+- **Student**: student4@school.edu / password
+- **Student**: student5@school.edu / password
 
 ## Project Structure
 
@@ -137,11 +125,9 @@ SchoolManagementSystem/
 ### Public Roles (visible on portal)
 - Student
 - Teacher
-- Management
 
 ### Private Roles (separate login portals)
 - Admin (`/admin/login`)
-- Super Admin (`/super-admin/login`)
 
 ## Security
 
@@ -149,7 +135,6 @@ SchoolManagementSystem/
 - Password hashing with bcrypt
 - Role-Based Access Control (RBAC)
 - Backend authorization on all protected endpoints
-- School data isolation for multi-school support
 - Student data isolation
 - Teacher class restrictions
 

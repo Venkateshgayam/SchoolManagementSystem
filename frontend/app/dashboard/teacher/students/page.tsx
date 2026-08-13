@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { Search, UserCheck, Mail, BookOpen, Eye } from "lucide-react";
@@ -153,7 +154,7 @@ export default function TeacherStudentsPage() {
                       <Mail className="h-4 w-4 text-gray-400" /> {s.parent_email || "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {new Date(s.enrollment_date).toLocaleDateString()}
+                      {formatDate(s.enrollment_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span

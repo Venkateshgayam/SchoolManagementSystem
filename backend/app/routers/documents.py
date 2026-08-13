@@ -12,9 +12,8 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 @router.get("/", response_model=List[DocumentResponse])
 async def list_documents(
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     if current_user.get("role") == "student":
         student = await get_current_student(current_user=current_user, db=db)
         result = await db.execute(select(Document).where(Document.student_id == student.id))
@@ -27,9 +26,8 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
     if not document:
@@ -42,9 +40,8 @@ async def get_document(
 @router.post("/", response_model=DocumentResponse)
 async def create_document(
     request: DocumentCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
     data = request.model_dump(exclude_unset=True)
     data["uploaded_by"] = int(current_user["sub"])
     document = Document(**data)
@@ -58,9 +55,8 @@ async def create_document(
 async def update_document(
     document_id: int,
     request: DocumentUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
     if not document:
@@ -76,9 +72,8 @@ async def update_document(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
     if not document:

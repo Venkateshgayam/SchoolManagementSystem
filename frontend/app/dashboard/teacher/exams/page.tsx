@@ -1,9 +1,11 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import React from "react";
 import { BookOpen, Users, Save, PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Paperclip, Award, FileText } from "lucide-react";
 import api from "@/lib/api";
+import { useSettings } from "@/hooks/useSettings";
 
 interface TeacherInfo {
   id: number;
@@ -13,8 +15,8 @@ interface TeacherInfo {
 interface StudentInfo {
   id: number;
   user_id: number;
-  first_name: string;
-  last_name: string;
+  full_name?: string;
+  roll_number?: string | null;
   class_id: number | null;
 }
 
@@ -55,10 +57,12 @@ interface ExamInfo {
   name: string;
   exam_type: string | null;
   academic_year: string | null;
+  total_marks: number | null;
   slots: ExamSubjectSlot[];
 }
 
 export default function TeacherExamsPage() {
+  const { settings } = useSettings();
   const [teacher, setTeacher] = useState<TeacherInfo | null>(null);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [subjects, setSubjects] = useState<SubjectInfo[]>([]);
@@ -81,7 +85,7 @@ export default function TeacherExamsPage() {
           api.get("/subjects/").catch(() => ({ data: [] })),
           api.get("/exams/").catch(() => ({ data: [] })),
           api.get("/students/").catch(() => ({ data: [] })),
-          api.get("/exam-submissions").catch(() => ({ data: [] })),
+          api.get("/exam-submissions/").catch(() => ({ data: [] })),
         ]);
 
         setTeacher(teacherRes.data);
@@ -112,7 +116,7 @@ export default function TeacherExamsPage() {
     setGradingId(submissionId);
     try {
       await api.put(`/exam-submissions/${submissionId}/grade`, { grade: Number(val) });
-      const res = await api.get("/exam-submissions");
+      const res = await api.get("/exam-submissions/");
       setSubmissions(res.data);
       setGradeInputs((prev) => ({ ...prev, [submissionId]: "" }));
     } catch (err: any) {
@@ -168,7 +172,7 @@ export default function TeacherExamsPage() {
                           {getSubjectName(slot.subject_id)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {new Date(slot.date).toLocaleDateString()}
+                          {formatDate(slot.date)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {new Date(slot.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(slot.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -205,7 +209,7 @@ export default function TeacherExamsPage() {
                                       <li key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                         <div className="flex-1">
                                           <p className="text-sm font-medium text-gray-900 mb-1">
-                                            {student.first_name} {student.last_name}
+                                            {student.full_name || `Student #${student.id}`} {student.roll_number ? `(${student.roll_number})` : ""}
                                           </p>
                                           <div className="mt-2 text-sm text-gray-600 bg-gray-50 rounded p-3 border border-gray-100">
                                             {submission.submission_text ? (
@@ -244,11 +248,12 @@ export default function TeacherExamsPage() {
                                           <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-md border border-gray-200">
                                             <input
                                               type="number"
-                                              step="0.1"
+                                              step="1"
                                               min="0"
+                                              max={slot.exam.total_marks || settings.default_exam_marks_scale || 100}
                                               value={gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "")}
                                               onChange={(e) => setGradeInputs({ ...gradeInputs, [submission.id]: e.target.value })}
-                                              placeholder="Score"
+                                              placeholder={`/ ${slot.exam.total_marks || settings.default_exam_marks_scale || 100}`}
                                               className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
                                             />
                                             <button

@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Plus, Trash2, Link2, Calendar } from "lucide-react";
+import { FileText, Plus, Save, Download, Trash2, Calendar, File, Link2 } from "lucide-react";
+import {   formatStudentNameId , formatDate } from "@/lib/formatters";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
+import toast from "react-hot-toast";
 
 interface DocumentRecord { id: number; title: string; description: string | null; file_url: string | null; document_type: string | null; uploaded_by: number | null; student_id: number | null; created_at: string; }
-interface StudentRecord { id: number; roll_number: string | null; }
+interface StudentRecord { id: number; roll_number: string | null; full_name?: string; }
 
 export default function AdminDocumentsPage() {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -37,7 +39,8 @@ export default function AdminDocumentsPage() {
   const studentLabel = (id: number | null) => {
     if (!id) return "—";
     const s = students.find((st) => st.id === id);
-    return s?.roll_number ? `#${s.roll_number}` : `#${id}`;
+    if (!s) return `#${id}`;
+    return formatStudentNameId(s.full_name, s.id, s.roll_number);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -54,7 +57,7 @@ export default function AdminDocumentsPage() {
       setModalOpen(false);
       setForm({ title: "", description: "", file_url: "", document_type: "", student_id: "" });
       await load();
-    } catch (err: any) { alert(err?.response?.data?.detail || err?.message || "Could not create document"); }
+    } catch (err: any) { toast.error(err?.response?.data?.detail || err?.message || "Could not create document"); }
     finally { setSaving(false); }
   };
 
@@ -65,7 +68,7 @@ export default function AdminDocumentsPage() {
       await api.delete(`/documents/${deleting.id}`);
       setDocuments((p) => p.filter((d) => d.id !== deleting.id));
       setDeleting(null);
-    } catch (err: any) { alert(err?.response?.data?.detail || err?.message || "Could not delete document"); }
+    } catch (err: any) { toast.error(err?.response?.data?.detail || err?.message || "Could not delete document"); }
     finally { setDeleteLoading(false); }
   };
 
@@ -100,7 +103,7 @@ export default function AdminDocumentsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><FileText className="h-4 w-4 inline mr-1 text-gray-400" />{d.title}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{d.document_type || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{studentLabel(d.student_id)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{new Date(d.created_at).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{formatDate(d.created_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{d.file_url ? <a href={d.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 flex items-center gap-1"><Link2 className="h-3 w-3" />Open</a> : "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button onClick={() => setDeleting(d)} className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"><Trash2 className="h-3 w-3" /> Delete</button>
@@ -133,7 +136,7 @@ export default function AdminDocumentsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Student (optional)</label>
               <select value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} className="input">
                 <option value="">None</option>
-                {students.map((s) => <option key={s.id} value={s.id}>#{s.roll_number || s.id}</option>)}
+                {students.map((s) => <option key={s.id} value={s.id}>{s.full_name || `#${s.id}`} {s.roll_number ? `(${s.roll_number})` : ""}</option>)}
               </select>
             </div>
           </div>

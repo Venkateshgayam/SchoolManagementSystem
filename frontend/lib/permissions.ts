@@ -1,4 +1,4 @@
-import { getUser, KNOWN_ROLES, type Role } from "@/lib/auth";
+import { getUser, normalizeRole } from "@/lib/auth";
 
 export type Permission =
   | "student:create"
@@ -24,56 +24,41 @@ export type Permission =
   | "notification:create"
   | "user:manage";
 
-const PERMISSIONS: Record<Permission, readonly Role[]> = {
-  "student:create": ["admin", "super_admin"],
-  "student:update": ["admin", "super_admin"],
-  "student:delete": ["admin", "super_admin"],
-  "teacher:create": ["admin", "super_admin"],
-  "teacher:update": ["admin", "super_admin"],
-  "teacher:delete": ["admin", "super_admin"],
-  "class:create": ["admin", "super_admin"],
-  "class:update": ["admin", "super_admin"],
-  "class:delete": ["admin", "super_admin"],
-  "subject:create": ["admin", "super_admin"],
-  "subject:update": ["admin", "super_admin"],
-  "subject:delete": ["admin", "super_admin"],
-  "fee:create": ["admin", "super_admin", "management"],
-  "fee:update": ["admin", "super_admin", "management"],
-  "fee:delete": ["admin", "super_admin"],
-  "attendance:create": ["admin", "super_admin", "teacher"],
-  "assignment:create": ["admin", "super_admin", "teacher"],
-  "exam:create": ["admin", "super_admin"],
-  "grade:create": ["admin", "super_admin", "teacher"],
-  "grade:update": ["admin", "super_admin", "teacher"],
-  "notification:create": ["admin", "super_admin", "management", "teacher"],
-  "user:manage": ["super_admin"],
+// Final 3-role permission matrix.
+// Legacy roles (management, super_admin) are normalised to "admin" at login time,
+// so they naturally inherit all admin permissions without requiring separate entries.
+const PERMISSIONS: Record<Permission, readonly string[]> = {
+  "student:create":    ["admin"],
+  "student:update":   ["admin"],
+  "student:delete":   ["admin"],
+  "teacher:create":   ["admin"],
+  "teacher:update":   ["admin"],
+  "teacher:delete":   ["admin"],
+  "class:create":     ["admin"],
+  "class:update":     ["admin"],
+  "class:delete":     ["admin"],
+  "subject:create":   ["admin"],
+  "subject:update":   ["admin"],
+  "subject:delete":   ["admin"],
+  "fee:create":       ["admin"],
+  "fee:update":       ["admin"],
+  "fee:delete":       ["admin"],
+  "attendance:create":["admin", "teacher"],
+  "assignment:create":["admin", "teacher"],
+  "exam:create":      ["admin"],
+  "grade:create":     ["admin", "teacher"],
+  "grade:update":     ["admin", "teacher"],
+  "notification:create": ["admin", "teacher"],
+  "user:manage":      ["admin"],
 };
 
-// Additional mappings: expand management privileges for management role parity
-// Add fee permissions and allow management to perform student/teacher/subject operations where appropriate
-PERMISSIONS["student:create"] = ([...PERMISSIONS["student:create"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["student:update"] = ([...PERMISSIONS["student:update"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["student:delete"] = ([...PERMISSIONS["student:delete"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["teacher:create"] = ([...PERMISSIONS["teacher:create"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["teacher:update"] = ([...PERMISSIONS["teacher:update"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["teacher:delete"] = ([...PERMISSIONS["teacher:delete"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["subject:create"] = ([...PERMISSIONS["subject:create"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["subject:update"] = ([...PERMISSIONS["subject:update"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["subject:delete"] = ([...PERMISSIONS["subject:delete"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-PERMISSIONS["attendance:create"] = ([...PERMISSIONS["attendance:create"], "management"].filter((v, i, a) => a.indexOf(v) === i) as Role[]);
-
-// Fee permissions
-PERMISSIONS["fee:create"] = ["admin", "super_admin", "management"];
-PERMISSIONS["fee:update"] = ["admin", "super_admin", "management"];
-PERMISSIONS["fee:delete"] = ["admin", "super_admin"];
-
-export function currentRole(): Role | null {
+export function currentRole(): string | null {
   const user = getUser();
-  const role = user?.role;
-  return (KNOWN_ROLES as readonly string[]).includes(role) ? (role as Role) : null;
+  return normalizeRole(user?.role);
 }
 
-export function can(permission: Permission, role: Role | null = currentRole()): boolean {
+export function can(permission: Permission, role: string | null = currentRole()): boolean {
   if (!role) return false;
-  return PERMISSIONS[permission].includes(role);
+  const normalised = normalizeRole(role) ?? role;
+  return PERMISSIONS[permission]?.includes(normalised) ?? false;
 }

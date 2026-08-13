@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 from app.database.database import get_db
 from app.models.fee import Fee, FeeStatusEnum
 from app.models.student import Student
@@ -14,23 +15,40 @@ from app.utils.audit import write_audit_log
 router = APIRouter(prefix="/fees", tags=["fees"])
 
 
-def _populate_amount_due(fee: Fee) -> FeeResponse:
+from app.core.settings import get_setting
+from datetime import datetime, timedelta
+
+async def _populate_amount_due(fee: Fee, db: AsyncSession) -> FeeResponse:
     total_fee = 0.0
     amount_due = 0.0
     if fee.student and fee.student.class_ref:
         base_fee = fee.student.class_ref.fee_amount or 0.0
         waiver = fee.waiver_percentage or 0.0
         total_fee = base_fee * (1 - waiver / 100)
+        
+    late_fee_applied = 0.0
+    if fee.due_date and fee.amount_paid < total_fee:
+        grace_period = await get_setting(db, "late_fee_grace_period_days", 7)
+        if datetime.utcnow().date() > fee.due_date + timedelta(days=int(grace_period)):
+            late_fee_type = await get_setting(db, "late_fee_type", "flat")
+            late_fee_amount = await get_setting(db, "late_fee_amount", 15)
+            
+            if late_fee_type == "percentage":
+                late_fee_applied = total_fee * (float(late_fee_amount) / 100)
+            else:
+                late_fee_applied = float(late_fee_amount)
+                
+            total_fee += late_fee_applied
     
     amount_due = max(0.0, total_fee - fee.amount_paid)
     
     # Auto-calculate status
     if fee.amount_paid >= total_fee and total_fee > 0:
-        fee.status = FeeStatusEnum.paid
+        fee.status = FeeStatusEnum.PAID
     elif fee.amount_paid > 0:
-        fee.status = FeeStatusEnum.partial
+        fee.status = FeeStatusEnum.PARTIAL
     else:
-        fee.status = FeeStatusEnum.unpaid
+        fee.status = FeeStatusEnum.PENDING
 
     return FeeResponse(
         id=fee.id,
@@ -40,6 +58,7 @@ def _populate_amount_due(fee: Fee) -> FeeResponse:
         total_fee=total_fee,
         amount_paid=fee.amount_paid,
         amount_due=amount_due,
+        late_fee_applied=late_fee_applied,
         due_date=fee.due_date,
         paid_date=fee.paid_date,
         status=fee.status,
@@ -51,9 +70,8 @@ def _populate_amount_due(fee: Fee) -> FeeResponse:
 
 @router.get("/", response_model=List[FeeResponse])
 async def list_fees(
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "student")),
+    db: AsyncSession = Depends(get_db)):
     query = select(Fee).options(selectinload(Fee.student).selectinload(Student.class_ref))
     if current_user.get("role") == "student":
         student = await get_current_student(current_user=current_user, db=db)
@@ -61,15 +79,14 @@ async def list_fees(
     else:
         result = await db.execute(query)
     fees = result.scalars().all()
-    return [_populate_amount_due(f) for f in fees]
+    return [await _populate_amount_due(f, db) for f in fees]
 
 
 @router.get("/{fee_id}", response_model=FeeResponse)
 async def get_fee(
     fee_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "student")),
+    db: AsyncSession = Depends(get_db)):
     query = select(Fee).options(selectinload(Fee.student).selectinload(Student.class_ref)).where(Fee.id == fee_id)
     result = await db.execute(query)
     fee = result.scalar_one_or_none()
@@ -77,15 +94,18 @@ async def get_fee(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee record not found")
     if current_user.get("role") == "student" and fee.student_id != (await get_current_student(current_user=current_user, db=db)).id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    return _populate_amount_due(fee)
+    return await _populate_amount_due(fee, db)
 
 
 @router.post("/", response_model=FeeResponse)
 async def create_fee(
     request: FeeCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
+    current_academic_year = await get_setting(db, "current_academic_year", "2026-27")
+    if request.academic_year != current_academic_year:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Fee records can only be created for the current academic year ({current_academic_year}).")
+
     # Check if student exists to populate amount_due later
     result = await db.execute(select(Student).options(selectinload(Student.class_ref)).where(Student.id == request.student_id))
     student = result.scalar_one_or_none()
@@ -94,11 +114,15 @@ async def create_fee(
 
     fee = Fee(**request.model_dump(exclude_unset=True))
     db.add(fee)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A fee record already exists for this student in this academic year.")
     await db.refresh(fee)
     
     fee.student = student
-    resp = _populate_amount_due(fee)
+    resp = await _populate_amount_due(fee, db)
     fee.status = resp.status
     await db.commit()
 
@@ -108,8 +132,7 @@ async def create_fee(
         action="CREATE",
         entity_type="Fee",
         entity_id=fee.id,
-        description=f"Created fee record for student {fee.student_id}",
-    )
+        description=f"Created fee record for student {fee.student_id}")
     
     return resp
 
@@ -118,9 +141,8 @@ async def create_fee(
 async def update_fee(
     fee_id: int,
     request: FeeUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     query = select(Fee).options(selectinload(Fee.student).selectinload(Student.class_ref)).where(Fee.id == fee_id)
     result = await db.execute(query)
     fee = result.scalar_one_or_none()
@@ -129,7 +151,7 @@ async def update_fee(
         
     update_data = request.model_dump(exclude_unset=True)
     
-    if current_user.get("role") in ["admin", "super_admin", "management"] and "waiver_percentage" in update_data:
+    if current_user.get("role") in ["admin"] and "waiver_percentage" in update_data:
         fee.waiver_percentage = update_data["waiver_percentage"]
         
     if "payment_amount" in update_data:
@@ -142,7 +164,7 @@ async def update_fee(
     if "academic_year" in update_data:
         fee.academic_year = update_data["academic_year"]
 
-    resp = _populate_amount_due(fee)
+    resp = await _populate_amount_due(fee, db)
     fee.status = resp.status
     
     await db.commit()
@@ -154,8 +176,7 @@ async def update_fee(
         action="UPDATE",
         entity_type="Fee",
         entity_id=fee.id,
-        description=f"Updated fee record {fee.id}",
-    )
+        description=f"Updated fee record {fee.id}")
 
     return resp
 
@@ -163,9 +184,8 @@ async def update_fee(
 @router.delete("/{fee_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_fee(
     fee_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Fee).where(Fee.id == fee_id))
     fee = result.scalar_one_or_none()
     if not fee:
@@ -179,6 +199,5 @@ async def delete_fee(
         action="DELETE",
         entity_type="Fee",
         entity_id=fee_id,
-        description=f"Deleted fee record {fee_id}",
-    )
+        description=f"Deleted fee record {fee_id}")
     await db.commit()

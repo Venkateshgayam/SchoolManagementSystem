@@ -155,7 +155,7 @@ export default function TeacherAnnouncementsPage() {
               <option value="student">Students</option>
               <option value="parent">Parents</option>
               <option value="admin">Admin</option>
-              <option value="management">Management</option>
+
             </select>
           </div>
           <div className="flex items-end">

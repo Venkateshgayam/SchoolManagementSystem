@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
@@ -8,8 +8,9 @@ from app.models.teacher import Teacher
 from app.models.user import User, RoleEnum
 from app.schemas.teacher import TeacherCreate, TeacherUpdate, TeacherResponse
 from app.core.dependencies import require_role
-from app.core.security import hash_password
+from app.core.security import hash_password, generate_temporary_password
 from app.utils.audit import write_audit_log
+from app.utils.email import send_new_account_email
 
 router = APIRouter(prefix="/teachers", tags=["teachers"])
 
@@ -27,15 +28,13 @@ def _to_response(teacher: Teacher) -> TeacherResponse:
         employment_date=teacher.employment_date,
         status=teacher.status,
         created_at=teacher.created_at,
-        updated_at=teacher.updated_at,
-    )
+        updated_at=teacher.updated_at)
 
 
 @router.get("/me", response_model=TeacherResponse)
 async def read_current_teacher(
     current_user: dict = Depends(require_role("teacher")),
-    db: AsyncSession = Depends(get_db),
-):
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Teacher).options(selectinload(Teacher.user)).where(Teacher.user_id == int(current_user["sub"]))
     )
@@ -47,9 +46,8 @@ async def read_current_teacher(
 
 @router.get("/", response_model=List[TeacherResponse])
 async def list_teachers(
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Teacher).options(selectinload(Teacher.user)))
     teachers = result.scalars().all()
     return [_to_response(t) for t in teachers]
@@ -58,9 +56,8 @@ async def list_teachers(
 @router.get("/{teacher_id}", response_model=TeacherResponse)
 async def get_teacher(
     teacher_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management", "teacher")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Teacher).options(selectinload(Teacher.user)).where(Teacher.id == teacher_id)
     )
@@ -73,9 +70,9 @@ async def get_teacher(
 @router.post("/", response_model=TeacherResponse, status_code=status.HTTP_201_CREATED)
 async def create_teacher(
     request: TeacherCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     if request.user_id:
         user = (
             await db.execute(select(User).where(User.id == request.user_id))
@@ -85,23 +82,24 @@ async def create_teacher(
         if user.role != RoleEnum.teacher:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Linked user is not a teacher account")
     else:
-        if not (request.full_name and request.email and request.username and request.password):
+        if not (request.full_name and request.email and request.username):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="full_name, email, username and password are required when no user_id is provided",
-            )
+                detail="full_name, email, and username are required when no user_id is provided")
         if (await db.execute(select(User).where(User.email == request.email))).scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
         if (await db.execute(select(User).where(User.username == request.username))).scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+        
+        generated_password = request.password or generate_temporary_password()
+        
         user = User(
             email=request.email,
             username=request.username,
-            password_hash=hash_password(request.password),
+            password_hash=hash_password(generated_password),
             role=RoleEnum.teacher,
             full_name=request.full_name,
-            is_active=True,
-        )
+            is_active=True)
         db.add(user)
         await db.flush()
 
@@ -110,8 +108,7 @@ async def create_teacher(
         qualification=request.qualification,
         experience_years=request.experience_years,
         employment_date=request.employment_date,
-        status=request.status,
-    )
+        status=request.status)
     db.add(teacher)
     db.add(teacher)
     await db.commit()
@@ -122,9 +119,21 @@ async def create_teacher(
         action="CREATE",
         entity_type="Teacher",
         entity_id=teacher.id,
-        description=f"Created teacher {request.full_name or 'profile'}",
-    )
+        description=f"Created teacher {request.full_name or 'profile'}")
     await db.commit()
+
+    if not request.user_id:
+        # If we created a new user, send the email
+        # Get the login URL (assuming frontend runs on port 3000 locally, but ideally from settings)
+        login_url = "http://localhost:3000/login/teacher" 
+        background_tasks.add_task(
+            send_new_account_email,
+            email_to=request.email,
+            full_name=request.full_name,
+            username=request.username,
+            password=generated_password,
+            login_url=login_url
+        )
 
     result = await db.execute(
         select(Teacher).options(selectinload(Teacher.user)).where(Teacher.id == teacher.id)
@@ -136,9 +145,8 @@ async def create_teacher(
 async def update_teacher(
     teacher_id: int,
     request: TeacherUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Teacher).options(selectinload(Teacher.user)).where(Teacher.id == teacher_id)
     )
@@ -178,8 +186,7 @@ async def update_teacher(
         action="UPDATE",
         entity_type="Teacher",
         entity_id=teacher.id,
-        description=f"Updated teacher {user.full_name if user else teacher.id}",
-    )
+        description=f"Updated teacher {user.full_name if user else teacher.id}")
     await db.commit()
 
     result = await db.execute(
@@ -191,9 +198,8 @@ async def update_teacher(
 @router.delete("/{teacher_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_teacher(
     teacher_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Teacher).options(selectinload(Teacher.user)).where(Teacher.id == teacher_id)
     )
@@ -213,6 +219,5 @@ async def delete_teacher(
         action="DELETE",
         entity_type="Teacher",
         entity_id=teacher_id,
-        description=f"Deleted teacher {user.full_name if user else teacher_id}",
-    )
+        description=f"Deleted teacher {user.full_name if user else teacher_id}")
     await db.commit()

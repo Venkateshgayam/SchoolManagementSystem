@@ -12,9 +12,8 @@ router = APIRouter(prefix="/academic-calendar", tags=["academic_calendar"])
 
 @router.get("/", response_model=List[AcademicCalendarResponse])
 async def list_calendar_events(
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AcademicCalendar))
     events = result.scalars().all()
     return events
@@ -23,9 +22,8 @@ async def list_calendar_events(
 @router.get("/{event_id}", response_model=AcademicCalendarResponse)
 async def get_calendar_event(
     event_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AcademicCalendar).where(AcademicCalendar.id == event_id))
     event = result.scalar_one_or_none()
     if not event:
@@ -36,9 +34,8 @@ async def get_calendar_event(
 @router.post("/", response_model=AcademicCalendarResponse)
 async def create_calendar_event(
     request: AcademicCalendarCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     event = AcademicCalendar(**request.model_dump(exclude_unset=True))
     db.add(event)
     await db.commit()
@@ -50,9 +47,8 @@ async def create_calendar_event(
 async def update_calendar_event(
     event_id: int,
     request: AcademicCalendarUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AcademicCalendar).where(AcademicCalendar.id == event_id))
     event = result.scalar_one_or_none()
     if not event:
@@ -68,9 +64,8 @@ async def update_calendar_event(
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_calendar_event(
     event_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AcademicCalendar).where(AcademicCalendar.id == event_id))
     event = result.scalar_one_or_none()
     if not event:

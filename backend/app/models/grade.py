@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Integer, ForeignKey, Float, DateTime, UniqueConstraint, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base
@@ -19,8 +19,8 @@ class Grade(Base):
     percentage: Mapped[float | None] = mapped_column(Float, nullable=True)
     letter_grade: Mapped[str | None] = mapped_column(String(5), nullable=True)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     student = relationship("Student", backref="grades")
     subject = relationship("Subject", backref="grades")

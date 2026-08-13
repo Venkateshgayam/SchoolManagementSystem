@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
@@ -76,7 +77,7 @@ export default function StudentAcademicCalendarPage() {
                     <p className="text-sm text-gray-600 mt-1">{event.description}</p>
                   )}
                   <p className="text-sm text-gray-500 mt-1">
-                    {event.event_date && new Date(event.event_date).toLocaleDateString()}
+                    {event.event_date && formatDate(event.event_date)}
                     {event.event_type && ` · ${event.event_type}`}
                   </p>
                 </div>

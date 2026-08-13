@@ -1,14 +1,20 @@
 "use client";
 
+import { useSettings } from "@/hooks/useSettings";
+
 export default function Footer() {
+  const { settings } = useSettings();
+  const schoolName = settings.school_name || "School Management System";
+  const schoolInitials = schoolName.split(" ").map((w: string) => w[0]).join("").substring(0, 3).toUpperCase() || "SMS";
+
   return (
     <footer className="bg-gray-900 text-white mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
-            <div className="bg-primary-600 text-white font-bold text-lg px-3 py-1 rounded-lg inline-block">SMS</div>
+            <div className="bg-primary-600 text-white font-bold text-lg px-3 py-1 rounded-lg inline-block">{schoolInitials}</div>
             <p className="mt-4 text-sm text-gray-400">
-              School Management System — Modern education management platform dedicated to excellence.
+              {schoolName} — Modern education management platform dedicated to excellence.
             </p>
           </div>
           <div>
@@ -30,7 +36,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-8 pt-6 border-t border-gray-800 text-center text-sm text-gray-500">
-          &copy; {new Date().getFullYear()} School Management System. All rights reserved.
+          &copy; {new Date().getFullYear()} {schoolName}. All rights reserved.
         </div>
       </div>
     </footer>

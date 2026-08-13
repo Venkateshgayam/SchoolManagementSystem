@@ -5,6 +5,7 @@ import { Bell, CheckCheck, MailOpen } from "lucide-react";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
+import toast from "react-hot-toast";
 
 interface NotificationRecord {
   id: number;
@@ -54,7 +55,7 @@ export default function NotificationsPage() {
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
       notifyNavbar();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || err?.message || "Could not mark as read");
+      toast.error(err?.response?.data?.detail || err?.message || "Could not mark as read");
     } finally {
       setMarkingId(null);
     }
@@ -68,7 +69,7 @@ export default function NotificationsPage() {
       setNotifications((prev) => prev.map((x) => ({ ...x, is_read: true })));
       notifyNavbar();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || err?.message || "Could not mark all as read");
+      toast.error(err?.response?.data?.detail || err?.message || "Could not mark all as read");
     } finally {
       setMarkingAll(false);
     }

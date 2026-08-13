@@ -21,15 +21,13 @@ def _to_response(user: User) -> UserResponse:
         phone_number=user.phone_number,
         profile_picture_url=user.profile_picture_url,
         is_active=user.is_active,
-        created_at=user.created_at,
-    )
+        created_at=user.created_at)
 
 
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
-    current_user: dict = Depends(require_role("super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).order_by(User.id))
     users = result.scalars().all()
     return [_to_response(user) for user in users]
@@ -39,8 +37,7 @@ async def list_users(
 async def update_own_profile(
     request: UserProfileUpdate,
     current_user: dict = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db),
-):
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == int(current_user["sub"])))
     user = result.scalar_one_or_none()
     if not user:
@@ -56,9 +53,8 @@ async def update_own_profile(
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: int,
-    current_user: dict = Depends(require_role("super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -70,9 +66,8 @@ async def get_user(
 async def update_user(
     user_id: int,
     request: UserAdminUpdate,
-    current_user: dict = Depends(require_role("super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -88,9 +83,8 @@ async def update_user(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: int,
-    current_user: dict = Depends(require_role("super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     if int(current_user["sub"]) == user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own account")
     result = await db.execute(select(User).where(User.id == user_id))

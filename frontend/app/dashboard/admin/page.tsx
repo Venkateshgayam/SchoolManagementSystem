@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PageLoader from "@/components/dashboard/PageLoader";
 import Link from "next/link";
 import {
   Users, UserCheck, BookOpen, ClipboardList, AlertCircle, Clock, Bell,
@@ -9,15 +10,17 @@ import {
 import api from "@/lib/api";
 import StatCard from "@/components/dashboard/StatCard";
 import StatusBadge from "@/components/dashboard/StatusBadge";
+import {   formatStudentNameId, formatTeacherNameId , formatDate } from "@/lib/formatters";
+import { useSettings } from "@/hooks/useSettings";
 
-interface StudentRecord { id: number; roll_number: string | null; class_id: number | null; status: string; }
-interface TeacherRecord { id: number; user_id: number; qualification: string | null; experience_years: number | null; }
+interface StudentRecord { id: number; roll_number: string | null; class_id: number | null; status: string; full_name: string | null; }
+interface TeacherRecord { id: number; user_id: number; qualification: string | null; experience_years: number | null; full_name: string | null; }
 interface ClassRecord { id: number; name: string; section: string | null; teacher_id: number | null; }
 interface SubjectRecord { id: number; name: string; code: string | null; }
 interface ScheduleRecord { id: number; class_id: number; subject_id: number; day_of_week: number; start_time: string; end_time: string; room: string | null; }
 interface AttendanceRecord { student_id: number; status: string; }
 interface FeeRecord { amount: number; status: string; }
-interface LeaveRequestRecord { id: number; student_id: number; status: string; from_date: string; to_date: string; }
+interface LeaveRequestRecord { id: number; student_id: number | null; teacher_id: number | null; status: string; from_date: string; to_date: string; }
 interface ExamRecord { id: number; name: string; start_date: string | null; }
 interface AnnouncementRecord { id: number; title: string; content: string; is_pinned: boolean; created_at: string; }
 interface UserRecord { id: number; email: string; role: string; full_name: string; is_active: boolean; }
@@ -39,6 +42,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { settings } = useSettings();
 
   useEffect(() => {
     async function fetchAll() {
@@ -70,14 +74,20 @@ export default function AdminDashboard() {
 
   const attendanceRate =
     attendance.length === 0 ? 0 :
+    // attendance.filter / attendance.length is a ratio; * 100 is a mathematical percentage-conversion constant
     (attendance.filter((a) => a.status === "present").length / attendance.length) * 100;
-  const revenue = fees.reduce((sum, f) => sum + (f.status === "paid" ? f.amount : 0), 0);
-  const pendingFees = fees.filter((f) => f.status === "pending" || f.status === "overdue").length;
-  const pendingLeaves = leaves.filter((l) => l.status === "pending");
+  const attendanceThreshold: number = settings.attendance_at_risk_threshold ?? 75;
+  const attendanceTrend = attendance.length === 0
+    ? "No data yet"
+    : attendanceRate < attendanceThreshold
+      ? `⚠ Below ${attendanceThreshold}% threshold`
+      : `✓ Above ${attendanceThreshold}% threshold`;
+  const revenue = fees.reduce((sum, f) => sum + (f.status === "PAID" ? f.amount : 0), 0);
+  const pendingFees = fees.filter((f) => f.status === "PENDING" || f.status === "OVERDUE").length;
+  const pendingLeaves = leaves.filter((l) => l.status === "PENDING");
   const upcomingExams = exams.filter((e) => e.start_date && new Date(e.start_date) >= new Date());
   const todaySchedules = schedules.filter((s) => s.day_of_week === today);
-  const activeUsers = users.filter((u) => u.is_active).length;
-  const staffCount = users.filter((u) => u.role === "admin" || u.role === "management" || u.role === "super_admin").length;
+
 
   const getSubjectName = (subjectId: number | null) =>
     subjects.find((s) => s.id === subjectId)?.name || `Subject #${subjectId}`;
@@ -86,13 +96,7 @@ export default function AdminDashboard() {
     return c ? `${c.name} ${c.section || ""}`.trim() : `Class #${classId}`;
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading dashboard…</div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader label="Loading dashboard..." />;
   if (error) {
     return (
       <div className="card max-w-lg mx-auto text-center py-8">
@@ -114,15 +118,13 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard title="Total Students" value={students.length} icon={GraduationCap} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <StatCard title="Active Students" value={students.filter((s) => s.status === "active").length} icon={GraduationCap} />
         <StatCard title="Total Teachers" value={teachers.length} icon={UserCheck} />
         <StatCard title="Total Classes" value={classes.length} icon={BookOpen} />
         <StatCard title="Total Subjects" value={subjects.length} icon={BookOpen} />
-        <StatCard title="Attendance Rate" value={`${attendanceRate.toFixed(1)}%`} icon={ClipboardList} />
-        <StatCard title="Pending Leave Requests" value={pendingLeaves.length} icon={AlertCircle} />
+        <StatCard title="Total School Attendance" value={`${attendanceRate.toFixed(1)}%`} icon={ClipboardList} trend={attendanceTrend} />
         <StatCard title="Upcoming Exams" value={upcomingExams.length} icon={Calendar} />
-        <StatCard title="Revenue (Paid)" value={`$${revenue.toLocaleString()}`} icon={Wallet} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -155,13 +157,18 @@ export default function AdminDashboard() {
             <p className="text-gray-600">No pending leave requests.</p>
           ) : (
             <div className="space-y-2">
-              {pendingLeaves.slice(0, 5).map((l) => (
-                <div key={l.id} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700">Student #{l.student_id}</span>
-                  <span className="text-gray-500">{new Date(l.from_date).toLocaleDateString()} → {new Date(l.to_date).toLocaleDateString()}</span>
-                  <StatusBadge status={l.status} />
-                </div>
-              ))}
+              {pendingLeaves.slice(0, 5).map((l) => {
+                const s = l.student_id ? students.find(s => s.id === l.student_id) : null;
+                const t = l.teacher_id ? teachers.find(t => t.id === l.teacher_id) : null;
+                const nameStr = l.student_id ? formatStudentNameId(s?.full_name, l.student_id, s?.roll_number) : formatTeacherNameId(t?.full_name, l.teacher_id);
+                return (
+                  <div key={l.id} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">{nameStr}</span>
+                    <span className="text-gray-500">{formatDate(l.from_date)} → {formatDate(l.to_date)}</span>
+                    <StatusBadge status={l.status} />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -178,7 +185,7 @@ export default function AdminDashboard() {
               {upcomingExams.slice(0, 5).map((e) => (
                 <div key={e.id} className="flex justify-between text-sm">
                   <span className="font-medium text-gray-900">{e.name}</span>
-                  <span className="text-gray-500">{e.start_date ? new Date(e.start_date).toLocaleDateString() : "—"}</span>
+                  <span className="text-gray-500">{e.start_date ? formatDate(e.start_date) : "—"}</span>
                 </div>
               ))}
             </div>
@@ -189,7 +196,7 @@ export default function AdminDashboard() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Fee Summary</h2>
           <div className="grid grid-cols-2 gap-4 text-center mb-4">
             <div>
-              <p className="text-2xl font-bold text-gray-900">{fees.filter((f) => f.status === "paid").length}</p>
+              <p className="text-2xl font-bold text-gray-900">{fees.filter((f) => f.status === "PAID").length}</p>
               <p className="text-sm text-gray-500">Paid</p>
             </div>
             <div>
@@ -198,7 +205,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="border-t border-gray-100 pt-3 text-sm text-gray-600">
-            <span className="font-medium">{activeUsers}</span> active user accounts · <span className="font-medium">{staffCount}</span> staff
+            <span className="font-medium">{students.length}</span> students
           </div>
         </div>
 
@@ -221,7 +228,7 @@ export default function AdminDashboard() {
                     <div>
                       <p className="font-medium text-gray-900">{a.title}{a.is_pinned && " 📌"}</p>
                       <p className="text-sm text-gray-600 truncate max-w-md">{a.content}</p>
-                      <p className="text-xs text-gray-400">{new Date(a.created_at).toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-400">{formatDate(a.created_at)}</p>
                     </div>
                   </div>
                 ))}

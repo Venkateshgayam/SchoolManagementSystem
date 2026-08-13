@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Integer, ForeignKey, String, Text, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base
@@ -9,7 +9,7 @@ class TargetRoleEnum(str, enum.Enum):
     all = "all"
     students = "students"
     teachers = "teachers"
-    management = "management"
+    admin = "admin"
 
 
 class Announcement(Base):
@@ -20,8 +20,8 @@ class Announcement(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     target_role: Mapped[str | None] = mapped_column(SQLEnum(TargetRoleEnum), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
 
     def __repr__(self) -> str:

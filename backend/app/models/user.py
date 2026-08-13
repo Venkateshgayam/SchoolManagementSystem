@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database.database import Base
@@ -6,9 +6,7 @@ import enum
 
 
 class RoleEnum(str, enum.Enum):
-    super_admin = "super_admin"
     admin = "admin"
-    management = "management"
     teacher = "teacher"
     student = "student"
 
@@ -25,8 +23,8 @@ class User(Base):
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     profile_picture_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

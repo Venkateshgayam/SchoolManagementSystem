@@ -1,6 +1,8 @@
 "use client";
 
+import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
+import PageLoader from "@/components/dashboard/PageLoader";
 import StatCard from "@/components/dashboard/StatCard";
 import { Users, BookOpen, ClipboardList, Calendar, Clock, MapPin } from "lucide-react";
 import api from "@/lib/api";
@@ -153,13 +155,7 @@ export default function TeacherDashboard() {
     fetchAll();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading dashboard...</div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader label="Loading dashboard..." />;
 
   if (error) {
     return (
@@ -269,7 +265,7 @@ export default function TeacherDashboard() {
                   </p>
                   {a.due_date && (
                     <p className="text-sm text-gray-500">
-                      Due: {new Date(a.due_date).toLocaleDateString()}
+                      Due: {formatDate(a.due_date)}
                     </p>
                   )}
                 </div>

@@ -14,23 +14,19 @@ const PUBLIC_ROLES: Record<string, { role: string; title: string; subtitle: stri
     subtitle: "Access your teacher dashboard",
     placeholder: "teacher@school.edu",
   },
-  management: {
-    role: "management",
-    title: "Management Sign in",
-    subtitle: "Access the management dashboard",
-    placeholder: "management@school.edu",
-  },
 };
 
 export default function RoleLoginPage({ params }: { params: { role: string } }) {
   const { role } = params;
 
-  // Admin / Super Admin have dedicated login URLs; redirect there.
+  // Admin has a dedicated login URL; redirect there.
   if (role === "admin") {
     redirect("/admin/login");
   }
-  if (role === "super-admin") {
-    redirect("/super-admin/login");
+
+  // Legacy management / super-admin roles redirect to admin login.
+  if (role === "management" || role === "super-admin" || role === "super_admin") {
+    redirect("/admin/login");
   }
 
   const config = PUBLIC_ROLES[role];

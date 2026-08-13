@@ -6,18 +6,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB");
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
+/** @deprecated Use `currency_symbol` from useSettings() with toLocaleString() instead. */
+export function formatCurrency(amount: number, symbol = "$"): string {
+  return `${symbol}${Number(amount || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 export function percentage(value: number, total: number): number {

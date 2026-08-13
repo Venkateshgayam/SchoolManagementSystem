@@ -25,9 +25,8 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
 
 @router.get("/", response_model=List[ScheduleResponse])
 async def list_schedules(
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     role = current_user.get("role")
     if role == "student":
         student = await get_current_student(current_user=current_user, db=db)
@@ -46,9 +45,8 @@ async def list_schedules(
 @router.get("/{schedule_id}", response_model=ScheduleResponse)
 async def get_schedule(
     schedule_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Schedule).where(Schedule.id == schedule_id))
     schedule = result.scalar_one_or_none()
     if not schedule:
@@ -68,9 +66,8 @@ async def get_schedule(
 @router.post("/", response_model=ScheduleResponse)
 async def create_schedule(
     request: ScheduleCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     schedule = Schedule(**request.model_dump(exclude_unset=True))
     db.add(schedule)
     await db.commit()
@@ -82,9 +79,8 @@ async def create_schedule(
 async def update_schedule(
     schedule_id: int,
     request: ScheduleUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Schedule).where(Schedule.id == schedule_id))
     schedule = result.scalar_one_or_none()
     if not schedule:
@@ -100,9 +96,8 @@ async def update_schedule(
 @router.delete("/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_schedule(
     schedule_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Schedule).where(Schedule.id == schedule_id))
     schedule = result.scalar_one_or_none()
     if not schedule:

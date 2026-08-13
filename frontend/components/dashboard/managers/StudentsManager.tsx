@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Users, Plus, Save, Search, Mail, BookOpen, Pencil, Trash2 } from "lucide-react";
+import { Users, Plus, Save, Search, Mail, BookOpen, Pencil, Trash2, Eye } from "lucide-react";
+import { formatStudentNameId } from "@/lib/formatters";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
+import PageLoader from "@/components/dashboard/PageLoader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { can } from "@/lib/permissions";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface StudentRecord {
   id: number;
@@ -61,6 +65,9 @@ export default function StudentsManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  
+  const pathname = usePathname();
+  const role = pathname.split("/")[2] || "admin";
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StudentRecord | null>(null);
@@ -200,7 +207,7 @@ export default function StudentsManager() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading students…</div></div>;
+    return <PageLoader label="Loading..." />;
   }
   if (error) {
     return (
@@ -253,40 +260,37 @@ export default function StudentsManager() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enrolled</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  {(perm.update || perm.del) && (
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  )}
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filtered.map((s) => (
-                  <tr key={s.id}>
+                  <tr key={s.id} className="group hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{s.full_name || `Student #${s.id}`}</div>
+                      <div className="text-sm font-medium text-gray-900">{formatStudentNameId(s.full_name, s.id, s.roll_number)}</div>
                       <div className="text-xs text-gray-500">{s.email || `user#${s.user_id}`}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{s.roll_number || "N/A"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><BookOpen className="h-4 w-4 inline mr-1 text-gray-400" />{className(s.class_id)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Mail className="h-4 w-4 inline mr-1 text-gray-400" />{s.parent_email || "N/A"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(s.enrollment_date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={s.status} /></td>
-                    {(perm.update || perm.del) && (
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <Link href={`/dashboard/${role}/students/${s.id}`} className="text-gray-500 hover:text-blue-600 mr-3 inline-block" title="View student profile">
+                          <Eye className="h-4 w-4" />
+                        </Link>
                         {perm.update && (
-                          <button onClick={() => openEdit(s)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
+                          <button onClick={() => openEdit(s)} className="text-gray-500 hover:text-primary-600 mr-3 inline-block" title="Edit">
                             <Pencil className="h-4 w-4" />
                           </button>
                         )}
                         {perm.del && (
-                          <button onClick={() => setDeleteTarget(s)} className="text-gray-500 hover:text-red-600" title="Delete">
+                          <button onClick={() => setDeleteTarget(s)} className="text-gray-500 hover:text-red-600 inline-block" title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
-                      </td>
-                    )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

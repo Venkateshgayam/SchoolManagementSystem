@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { UserCheck, Plus, Save, Search, Award, Calendar, Pencil, Trash2 } from "lucide-react";
+import { UserCheck, Plus, Save, Search, Award, Calendar, Pencil, Trash2, Mail, Briefcase, Users, Eye } from "lucide-react";
+import {   formatTeacherNameId , formatDate } from "@/lib/formatters";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
+import PageLoader from "@/components/dashboard/PageLoader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import StatusBadge from "@/components/dashboard/StatusBadge";
@@ -27,7 +29,6 @@ interface FormState {
   full_name: string;
   email: string;
   username: string;
-  password: string;
   qualification: string;
   experience_years: string;
   employment_date: string;
@@ -38,7 +39,6 @@ const EMPTY_FORM: FormState = {
   full_name: "",
   email: "",
   username: "",
-  password: "",
   qualification: "",
   experience_years: "",
   employment_date: "",
@@ -54,6 +54,7 @@ export default function TeachersManager() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TeacherRecord | null>(null);
+  const [viewDetailsTarget, setViewDetailsTarget] = useState<TeacherRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TeacherRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -101,7 +102,6 @@ export default function TeachersManager() {
       full_name: teacher.full_name || "",
       email: teacher.email || "",
       username: teacher.username || "",
-      password: "",
       qualification: teacher.qualification || "",
       experience_years: teacher.experience_years?.toString() ?? "",
       employment_date: teacher.employment_date ? teacher.employment_date.slice(0, 10) : "",
@@ -123,10 +123,6 @@ export default function TeachersManager() {
       toast.error("Username is required.");
       return;
     }
-    if (!editing && form.password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
-      return;
-    }
     if (!editing && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       toast.error("Please enter a valid email address.");
       return;
@@ -137,7 +133,6 @@ export default function TeachersManager() {
         full_name: form.full_name.trim(),
         email: form.email.trim() || null,
         username: form.username.trim() || null,
-        password: form.password || null,
         qualification: form.qualification || null,
         experience_years: form.experience_years === "" ? null : Number(form.experience_years),
         employment_date: form.employment_date || null,
@@ -146,7 +141,6 @@ export default function TeachersManager() {
       if (editing) {
         delete body.email;
         delete body.username;
-        if (!form.password) delete body.password;
         await api.put(`/teachers/${editing.id}`, body);
         toast.success("Teacher updated successfully.");
       } else {
@@ -179,7 +173,7 @@ export default function TeachersManager() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading teachers…</div></div>;
+    return <PageLoader label="Loading..." />;
   }
   if (error) {
     return (
@@ -232,26 +226,25 @@ export default function TeachersManager() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qualification</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Experience</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employed</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  {(perm.update || perm.del) && (
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  )}
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filtered.map((t) => (
-                  <tr key={t.id}>
+                  <tr key={t.id} className="group hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{t.full_name || `Teacher #${t.id}`}</div>
+                      <div className="text-sm font-medium text-gray-900">{formatTeacherNameId(t.full_name, t.id)}</div>
                       <div className="text-xs text-gray-500">{t.email || `user#${t.user_id}`}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Award className="h-4 w-4 inline mr-1 text-gray-400" />{t.qualification || "N/A"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{t.experience_years ?? "—"} yr(s)</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{new Date(t.employment_date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={t.status} /></td>
-                    {(perm.update || perm.del) && (
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <button onClick={() => setViewDetailsTarget(t)} className="text-gray-500 hover:text-blue-600 mr-3 inline-block" title="View teacher profile">
+                          <Eye className="h-4 w-4" />
+                        </button>
                         {perm.update && (
                           <button onClick={() => openEdit(t)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
                             <Pencil className="h-4 w-4" />
@@ -262,8 +255,8 @@ export default function TeachersManager() {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
-                      </td>
-                    )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -294,15 +287,6 @@ export default function TeachersManager() {
               <input type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} disabled={!!editing} placeholder="e.g. john.smith" className="input-field disabled:bg-gray-100 disabled:text-gray-400" />
             </div>
             <div>
-              <PasswordInput
-                id="password"
-                label={editing ? "New Password (optional)" : "Password"}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder={editing ? "Leave blank to keep current" : "At least 8 characters"}
-              />
-            </div>
-            <div>
               <label className="label">Experience (years)</label>
               <input type="number" min={0} value={form.experience_years} onChange={(e) => setForm({ ...form, experience_years: e.target.value })} placeholder="e.g. 5" className="input-field" />
             </div>
@@ -325,6 +309,46 @@ export default function TeachersManager() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={!!viewDetailsTarget} title="Teacher Details" onClose={() => setViewDetailsTarget(null)}>
+        {viewDetailsTarget && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Name</p>
+                <p className="font-medium">{viewDetailsTarget.full_name || `Teacher #${viewDetailsTarget.id}`}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Email</p>
+                <p className="font-medium">{viewDetailsTarget.email || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Username</p>
+                <p className="font-medium">{viewDetailsTarget.username || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Status</p>
+                <div className="mt-1"><StatusBadge status={viewDetailsTarget.status} /></div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Qualification</p>
+                <p className="font-medium">{viewDetailsTarget.qualification || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Experience</p>
+                <p className="font-medium">{viewDetailsTarget.experience_years ?? "—"} yr(s)</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Employment Date</p>
+                <p className="font-medium">{viewDetailsTarget.employment_date ? formatDate(viewDetailsTarget.employment_date) : "N/A"}</p>
+              </div>
+            </div>
+            <div className="flex justify-end pt-4">
+              <button onClick={() => setViewDetailsTarget(null)} className="btn-secondary">Close</button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <ConfirmDialog

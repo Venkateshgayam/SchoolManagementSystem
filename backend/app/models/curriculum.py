@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Integer, ForeignKey, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base
@@ -13,8 +13,8 @@ class Curriculum(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     teaching_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     subject = relationship("Subject", backref="curricula")
     class_ref = relationship("Class", backref="curricula")

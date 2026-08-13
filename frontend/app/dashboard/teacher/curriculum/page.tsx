@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { BookOpen, UserCheck } from "lucide-react";
@@ -32,7 +33,6 @@ interface CurriculumInfo {
   id: number;
   class_id: number;
   subject_id: number;
-  name: string;
   description: string | null;
   created_at: string;
   updated_at: string | null;
@@ -129,7 +129,9 @@ export default function TeacherCurriculumPage() {
               <div key={c.id} className="card">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-900">{c.name}</h2>
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      {subjects.find((s) => s.id === c.subject_id)?.name || `Subject #${c.subject_id}`} Curriculum
+                    </h2>
                     <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
                       <UserCheck className="h-4 w-4" />
                       {classes.find((cl) => cl.id === c.class_id)
@@ -142,7 +144,7 @@ export default function TeacherCurriculumPage() {
                     </p>
                   </div>
                   <span className="text-xs text-gray-400">
-                    Updated {new Date(c.updated_at || c.created_at).toLocaleDateString()}
+                    Updated {formatDate(c.updated_at || c.created_at)}
                   </span>
                 </div>
                 {c.description && <p className="text-gray-600 mt-3">{c.description}</p>}

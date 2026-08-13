@@ -1,7 +1,15 @@
-from datetime import datetime, date
-from sqlalchemy import Integer, ForeignKey, Date, Text, String, DateTime
+from datetime import datetime, timezone, date
+import enum
+from sqlalchemy import Integer, ForeignKey, Date, Text, String, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base
+
+
+class LeaveRequestStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
 
 
 class LeaveRequest(Base):
@@ -13,11 +21,11 @@ class LeaveRequest(Base):
     from_date: Mapped[date] = mapped_column(Date, nullable=False)
     to_date: Mapped[date] = mapped_column(Date, nullable=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="pending")
+    status: Mapped[LeaveRequestStatus] = mapped_column(SQLEnum(LeaveRequestStatus), default=LeaveRequestStatus.PENDING)
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     student = relationship("Student", backref="leave_requests")
 

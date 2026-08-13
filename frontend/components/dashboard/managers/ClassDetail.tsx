@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, Users, UserCheck, Calendar, ArrowLeft } from "lucide-react";
+import { BookOpen, Users, UserCheck, Calendar, ArrowLeft, Eye } from "lucide-react";
+import {   formatStudentNameId , formatDate } from "@/lib/formatters";
 import api from "@/lib/api";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import PageHeader from "@/components/dashboard/PageHeader";
+import PageLoader from "@/components/dashboard/PageLoader";
+import { useSettings } from "@/hooks/useSettings";
 
 interface ClassInfo {
   id: number;
@@ -31,6 +34,10 @@ export default function ClassDetail({ classId }: { classId: number }) {
   const [error, setError] = useState<string | null>(null);
   const pathname = usePathname();
   const role = pathname.split("/")[2] || "admin";
+  
+  const { settings } = useSettings();
+  const currencySymbol = settings.currency_symbol || "$";
+  const formatCurrency = (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   useEffect(() => {
     async function fetchData() {
@@ -51,7 +58,7 @@ export default function ClassDetail({ classId }: { classId: number }) {
     fetchData();
   }, [classId]);
 
-  if (loading) return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading details...</div></div>;
+  if (loading) return <PageLoader label="Loading..." />;
   if (error || !cls) return (
     <div className="card max-w-lg mx-auto text-center py-8">
       <p className="text-gray-600 mb-4">{error || "Class not found"}</p>
@@ -84,7 +91,7 @@ export default function ClassDetail({ classId }: { classId: number }) {
         </div>
         <div className="card flex items-center gap-4">
           <div className="p-3 bg-blue-50 rounded-lg"><Calendar className="h-6 w-6 text-blue-600" /></div>
-          <div><p className="text-sm font-medium text-gray-500">Base Fee</p><h3 className="text-xl font-bold text-gray-900">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(cls.fee_amount || 0)}</h3></div>
+          <div><p className="text-sm font-medium text-gray-500">Base Fee</p><h3 className="text-xl font-bold text-gray-900">{formatCurrency(cls.fee_amount || 0)}</h3></div>
         </div>
       </div>
 
@@ -101,18 +108,26 @@ export default function ClassDetail({ classId }: { classId: number }) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enrollment</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {students.map((s) => (
-                  <tr key={s.id}>
+                  <tr key={s.id} className="group hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{s.roll_number || "N/A"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{s.full_name || `#${s.id}`}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(s.enrollment_date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatStudentNameId(s.full_name, s.id, s.roll_number)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(s.enrollment_date)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${s.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
                         {s.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <Link href={`/dashboard/${role}/students/${s.id}`} className="text-gray-500 hover:text-blue-600 inline-block" title="Click here for student profile">
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

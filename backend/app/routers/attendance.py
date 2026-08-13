@@ -26,9 +26,8 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
 
 @router.get("/", response_model=List[AttendanceResponse])
 async def list_attendance(
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     role = current_user.get("role")
     if role == "student":
         student = await get_current_student(current_user=current_user, db=db)
@@ -54,9 +53,8 @@ async def list_attendance(
 @router.get("/{attendance_id}", response_model=AttendanceResponse)
 async def get_attendance(
     attendance_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Attendance).where(Attendance.id == attendance_id))
     record = result.scalar_one_or_none()
     if not record:
@@ -77,9 +75,17 @@ async def get_attendance(
 @router.post("/", response_model=AttendanceResponse)
 async def create_attendance(
     request: AttendanceCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
+    
+    if current_user.get("role") == "teacher":
+        class_ids = await _teacher_class_ids(db, current_user)
+        student = (
+            await db.execute(select(Student).where(Student.id == request.student_id))
+        ).scalar_one_or_none()
+        if not student or student.class_id not in class_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot mark attendance for student not in your assigned classes")
+            
     record = Attendance(**request.model_dump(exclude_unset=True))
     db.add(record)
     await db.commit()
@@ -91,8 +97,7 @@ async def create_attendance(
         action="CREATE",
         entity_type="Attendance",
         entity_id=record.id,
-        description=f"Created attendance record for student {record.student_id}",
-    )
+        description=f"Created attendance record for student {record.student_id}")
     await db.commit()
 
     return record
@@ -102,13 +107,21 @@ async def create_attendance(
 async def update_attendance(
     attendance_id: int,
     request: AttendanceUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Attendance).where(Attendance.id == attendance_id))
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attendance record not found")
+        
+    if current_user.get("role") == "teacher":
+        class_ids = await _teacher_class_ids(db, current_user)
+        student = (
+            await db.execute(select(Student).where(Student.id == record.student_id))
+        ).scalar_one_or_none()
+        if not student or student.class_id not in class_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify attendance for student not in your assigned classes")
+            
     update_data = request.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(record, key, value)
@@ -121,8 +134,7 @@ async def update_attendance(
         action="UPDATE",
         entity_type="Attendance",
         entity_id=record.id,
-        description=f"Updated attendance record {record.id}",
-    )
+        description=f"Updated attendance record {record.id}")
     await db.commit()
 
     return record
@@ -131,9 +143,8 @@ async def update_attendance(
 @router.delete("/{attendance_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_attendance(
     attendance_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Attendance).where(Attendance.id == attendance_id))
     record = result.scalar_one_or_none()
     if not record:
@@ -147,6 +158,5 @@ async def delete_attendance(
         action="DELETE",
         entity_type="Attendance",
         entity_id=attendance_id,
-        description=f"Deleted attendance record {attendance_id}",
-    )
+        description=f"Deleted attendance record {attendance_id}")
     await db.commit()

@@ -6,7 +6,7 @@ interface StatCardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  trend?: string;
+  trend?: React.ReactNode;
 }
 
 export default function StatCard({ title, value, icon: Icon, trend }: StatCardProps) {

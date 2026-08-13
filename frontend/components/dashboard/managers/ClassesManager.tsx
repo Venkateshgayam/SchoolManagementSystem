@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { BookOpen, Plus, Save, Search, Pencil, Trash2, Users } from "lucide-react";
+import { BookOpen, Plus, Save, Search, Pencil, Trash2, Users, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import PageHeader from "@/components/dashboard/PageHeader";
+import PageLoader from "@/components/dashboard/PageLoader";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import { can } from "@/lib/permissions";
+import { useSettings } from "@/hooks/useSettings";
 
 interface ClassRecord {
   id: number;
@@ -53,6 +55,10 @@ export default function ClassesManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  
+  const { settings } = useSettings();
+  const currencySymbol = settings.currency_symbol || "$";
+  const formatCurrency = (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ClassRecord | null>(null);
@@ -170,7 +176,7 @@ export default function ClassesManager() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading classes…</div></div>;
+    return <PageLoader label="Loading..." />;
   }
   if (error) {
     return (
@@ -226,40 +232,39 @@ export default function ClassesManager() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Capacity</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Base Fee</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Teacher</th>
-                  {(perm.update || perm.del) && (
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  )}
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filtered.map((c) => (
-                  <tr key={c.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Link href={`/dashboard/${role}/classes/${c.id}`} className="text-primary-600 hover:text-primary-800 hover:underline">
-                        {c.name}
-                      </Link>
+                  <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {c.name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.section || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.academic_year || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{c.capacity ?? "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(c.fee_amount || 0)}
+                      {formatCurrency(c.fee_amount || 0)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Users className="h-4 w-4 inline mr-1 text-gray-400" />{teacherName(c.teacher_id)}</td>
-                    {(perm.update || perm.del) && (
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <Link href={`/dashboard/${role}/classes/${c.id}`} className="text-gray-500 hover:text-blue-600 mr-3 inline-block" title="Click here for class details">
+                          <Eye className="h-4 w-4" />
+                        </Link>
                         {perm.update && (
-                          <button onClick={() => openEdit(c)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
+                          <button onClick={() => openEdit(c)} className="text-gray-500 hover:text-primary-600 mr-3 inline-block" title="Edit">
                             <Pencil className="h-4 w-4" />
                           </button>
                         )}
                         {perm.del && (
-                          <button onClick={() => setDeleteTarget(c)} className="text-gray-500 hover:text-red-600" title="Delete">
+                          <button onClick={() => setDeleteTarget(c)} className="text-gray-500 hover:text-red-600 inline-block" title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
-                      </td>
-                    )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -291,7 +296,7 @@ export default function ClassesManager() {
               <input type="number" min={1} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} placeholder="e.g. 40" className="input-field" />
             </div>
             <div>
-              <label className="label">Base Fee Amount (₹)</label>
+              <label className="label">Base Fee Amount ({currencySymbol})</label>
               <input type="number" min={0} step="0.01" value={form.fee_amount} onChange={(e) => setForm({ ...form, fee_amount: e.target.value })} placeholder="e.g. 15000" className="input-field" />
             </div>
             <div>

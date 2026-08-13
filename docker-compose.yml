@@ -29,6 +29,12 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
       ENVIRONMENT: ${ENVIRONMENT}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}
+      EMAILS_FROM_NAME: ${EMAILS_FROM_NAME}
     ports:
       - "8000:8000"
     depends_on:
@@ -50,7 +56,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-
 volumes:
   postgres_data:
   uploads_data:

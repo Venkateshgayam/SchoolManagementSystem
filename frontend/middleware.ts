@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const knownRoles = ["student", "teacher", "management", "admin", "super_admin"];
+// Final 3 canonical roles
+const CANONICAL_ROLES = ["student", "teacher", "admin"];
 
-// Map role -> role-specific dashboard prefix
+// Map canonical role -> dashboard prefix
 const ROLE_DASHBOARD_PREFIXES: Record<string, string> = {
   student: "/dashboard/student",
   teacher: "/dashboard/teacher",
-  management: "/dashboard/management",
   admin: "/dashboard/admin",
-  super_admin: "/dashboard/super-admin",
 };
+
+function normalizeRole(role: string | null): string | null {
+  if (!role) return null;
+  if (CANONICAL_ROLES.includes(role)) return role;
+  return null;
+}
 
 function getRoleFromToken(token: string | undefined): string | null {
   if (!token) return null;
@@ -28,55 +33,57 @@ function getRoleFromToken(token: string | undefined): string | null {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get("access_token")?.value;
-  const role = getRoleFromToken(token);
-  const isAuthenticated = !!role && knownRoles.includes(role);
 
-  // Login pages - redirect to role-specific dashboard if already signed in
-  if (
-    pathname === "/login" ||
-    pathname.startsWith("/login/") ||
-    pathname === "/admin/login" ||
-    pathname === "/super-admin/login" ||
-    pathname.startsWith("/admin/login") ||
-    pathname.startsWith("/super-admin/login")
-  ) {
+
+
+  const rawToken = request.cookies.get("access_token")?.value;
+  const rawRole = getRoleFromToken(rawToken);
+  const role = normalizeRole(rawRole);
+  const isAuthenticated = !!role;
+
+  // 2. Login pages – redirect authenticated users to their dashboard
+  const loginPaths = ["/login", "/admin/login"];
+  const isLoginPage =
+    loginPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
+    pathname.startsWith("/login/");
+
+  if (isLoginPage) {
     if (isAuthenticated && role) {
-      return NextResponse.redirect(new URL(ROLE_DASHBOARD_PREFIXES[role] || "/dashboard", request.url));
+      return NextResponse.redirect(
+        new URL(ROLE_DASHBOARD_PREFIXES[role] || "/dashboard", request.url)
+      );
     }
     return NextResponse.next();
   }
 
-  // Protect all dashboard routes
+  // 3. Protect all /dashboard/* routes
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
-    if (!token || !isAuthenticated || !role) {
+    if (!isAuthenticated || !role) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    // Generic /dashboard -> redirect to role-specific dashboard
+    // Generic /dashboard → role-specific dashboard
     if (pathname === "/dashboard") {
-      return NextResponse.redirect(new URL(ROLE_DASHBOARD_PREFIXES[role] || "/dashboard", request.url));
+      return NextResponse.redirect(
+        new URL(ROLE_DASHBOARD_PREFIXES[role] || "/dashboard", request.url)
+      );
     }
 
-    // Role-specific dashboard routes: enforce role-based access
+    // Enforce role-based access to role-specific dashboard areas
     for (const [allowedRole, prefix] of Object.entries(ROLE_DASHBOARD_PREFIXES)) {
       if (pathname === prefix || pathname.startsWith(prefix + "/")) {
-        // Only the matching role may access this role's dashboard
         if (role !== allowedRole) {
-          return NextResponse.redirect(new URL(ROLE_DASHBOARD_PREFIXES[role] || "/dashboard", request.url));
+          // Wrong role – redirect to their own dashboard
+          return NextResponse.redirect(
+            new URL(ROLE_DASHBOARD_PREFIXES[role] || "/dashboard", request.url)
+          );
         }
         return NextResponse.next();
       }
     }
 
-    // Consolidated dashboard routes (e.g. /dashboard/attendance, /dashboard/profile)
-    // are accessible to any authenticated user.
+    // Shared dashboard routes (e.g. /dashboard/profile, /dashboard/change-password)
     return NextResponse.next();
-  }
-
-  // Other protected pages (profile/change-password) -> login if not authenticated
-  if ((pathname === "/profile" || pathname === "/change-password") && !isAuthenticated) {
-    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return NextResponse.next();
@@ -85,13 +92,9 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
-    "/profile",
-    "/change-password",
     "/login",
     "/login/:path*",
     "/admin/login",
-    "/super-admin/login",
     "/admin/login/:path*",
-    "/super-admin/login/:path*",
   ],
 };

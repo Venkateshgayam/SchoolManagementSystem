@@ -1,8 +1,10 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { ClipboardList, Clock, CheckCircle, Send, Paperclip, X, FileText, Image as ImageIcon } from "lucide-react";
 import api from "@/lib/api";
+import { useSettings } from "@/hooks/useSettings";
 
 interface AssignmentRecord {
   id: number;
@@ -41,6 +43,8 @@ export default function StudentAssignmentsPage() {
   const [submitText, setSubmitText] = useState<Record<number, string>>({});
   const [submitFile, setSubmitFile] = useState<Record<number, File | null>>({});
   const [previewUrl, setPreviewUrl] = useState<Record<number, string | null>>({});
+  const { settings } = useSettings();
+  const maxAssignmentMarks = settings.default_assignment_marks_scale || 30;
 
   useEffect(() => {
     async function fetchData() {
@@ -181,7 +185,7 @@ export default function StudentAssignmentsPage() {
                   </p>
                   {assignment.due_date && (
                     <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                      <Clock className="h-4 w-4" /> Due: {new Date(assignment.due_date).toLocaleDateString()}
+                      <Clock className="h-4 w-4" /> Due: {formatDate(assignment.due_date)}
                     </p>
                   )}
                 </div>
@@ -266,7 +270,7 @@ export default function StudentAssignmentsPage() {
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <span className="text-sm text-green-600">Submitted</span>
                       {submission?.grade !== null && submission?.grade !== undefined && (
-                        <span className="text-sm text-gray-500">· Marks: {submission.grade}</span>
+                        <span className="text-sm text-gray-500">· Marks: {submission.grade} / {maxAssignmentMarks}</span>
                       )}
                     </div>
                   </div>

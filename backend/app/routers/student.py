@@ -30,8 +30,7 @@ def _to_response(student: Student) -> StudentResponse:
         enrollment_date=student.enrollment_date,
         status=student.status,
         created_at=student.created_at,
-        updated_at=student.updated_at,
-    )
+        updated_at=student.updated_at)
 
 
 async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
@@ -47,8 +46,7 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
 @router.get("/me", response_model=StudentResponse)
 async def get_current_student(
     current_user: dict = Depends(require_role("student")),
-    db: AsyncSession = Depends(get_db),
-):
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Student).options(selectinload(Student.user)).where(Student.user_id == int(current_user["sub"]))
     )
@@ -60,9 +58,8 @@ async def get_current_student(
 
 @router.get("/", response_model=List[StudentResponse])
 async def list_students(
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher")),
+    db: AsyncSession = Depends(get_db)):
     query = select(Student).options(selectinload(Student.user))
     if current_user.get("role") == "teacher":
         class_ids = await _teacher_class_ids(db, current_user)
@@ -77,9 +74,8 @@ async def list_students(
 @router.get("/{student_id}", response_model=StudentResponse)
 async def get_student(
     student_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "teacher", "management", "student")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Student).options(selectinload(Student.user)).where(Student.id == student_id)
     )
@@ -103,9 +99,8 @@ async def get_student(
 @router.post("/", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def create_student(
     request: StudentCreate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     if request.user_id:
         user = (
             await db.execute(select(User).where(User.id == request.user_id))
@@ -118,8 +113,7 @@ async def create_student(
         if not (request.full_name and request.email and request.username and request.password):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="full_name, email, username and password are required when no user_id is provided",
-            )
+                detail="full_name, email, username and password are required when no user_id is provided")
         if (await db.execute(select(User).where(User.email == request.email))).scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
         if (await db.execute(select(User).where(User.username == request.username))).scalar_one_or_none():
@@ -130,8 +124,7 @@ async def create_student(
             password_hash=hash_password(request.password),
             role=RoleEnum.student,
             full_name=request.full_name,
-            is_active=True,
-        )
+            is_active=True)
         db.add(user)
         await db.flush()
 
@@ -141,8 +134,7 @@ async def create_student(
         class_id=request.class_id,
         parent_email=request.parent_email,
         enrollment_date=request.enrollment_date,
-        status=request.status,
-    )
+        status=request.status)
     db.add(student)
     await db.commit()
     
@@ -152,8 +144,7 @@ async def create_student(
         action="CREATE",
         entity_type="Student",
         entity_id=student.id,
-        description=f"Created student {request.full_name or 'profile'}",
-    )
+        description=f"Created student {request.full_name or 'profile'}")
     await db.commit()
 
     result = await db.execute(
@@ -166,9 +157,8 @@ async def create_student(
 async def update_student(
     student_id: int,
     request: StudentUpdate,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Student).options(selectinload(Student.user)).where(Student.id == student_id)
     )
@@ -191,7 +181,7 @@ async def update_student(
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
 
-    profile_fields = {"roll_number", "class_id", "parent_email", "status"}
+    profile_fields = {"roll_number", "class_id", "parent_email", "status", "enrollment_date"}
     for key, value in data.items():
         if key in profile_fields:
             setattr(student, key, value)
@@ -208,8 +198,7 @@ async def update_student(
         action="UPDATE",
         entity_type="Student",
         entity_id=student.id,
-        description=f"Updated student {user.full_name if user else student.id}",
-    )
+        description=f"Updated student {user.full_name if user else student.id}")
     await db.commit()
 
     result = await db.execute(
@@ -221,9 +210,8 @@ async def update_student(
 @router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student(
     student_id: int,
-    current_user: dict = Depends(require_role("admin", "super_admin", "management")),
-    db: AsyncSession = Depends(get_db),
-):
+    current_user: dict = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Student).options(selectinload(Student.user)).where(Student.id == student_id)
     )
@@ -243,6 +231,5 @@ async def delete_student(
         action="DELETE",
         entity_type="Student",
         entity_id=student_id,
-        description=f"Deleted student {user.full_name if user else student_id}",
-    )
+        description=f"Deleted student {user.full_name if user else student_id}")
     await db.commit()

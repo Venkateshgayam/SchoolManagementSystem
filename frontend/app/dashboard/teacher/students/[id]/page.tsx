@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -7,6 +8,8 @@ import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
 import Link from "next/link";
+import { useSettings } from "@/hooks/useSettings";
+import OverallResult, { OverallResultData } from "@/components/dashboard/OverallResult";
 
 interface StudentProfile {
   id: number;
@@ -45,6 +48,10 @@ interface GradeRecord {
   marks_obtained: number;
   total_marks: number;
   percentage: number | null;
+  subject?: {
+    id: number;
+    name: string;
+  };
 }
 
 interface SubjectInfo {
@@ -67,8 +74,13 @@ export default function StudentProfilePage() {
   const [grades, setGrades] = useState<GradeRecord[]>([]);
   const [subjects, setSubjects] = useState<SubjectInfo[]>([]);
   const [exams, setExams] = useState<ExamInfo[]>([]);
+  const [overallResult, setOverallResult] = useState<OverallResultData | null>(null);
+  const [selectedExamId, setSelectedExamId] = useState<number | "">("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { settings } = useSettings();
+  const attendanceThreshold = settings.attendance_at_risk_threshold || 75;
 
   useEffect(() => {
     async function fetchProfile() {
@@ -85,9 +97,18 @@ export default function StudentProfilePage() {
         
         // Filter attendance and grades for this specific student
         setAttendance(attRes.data.filter((a: any) => a.student_id === Number(id)));
-        setGrades(gradesRes.data.filter((g: any) => g.student_id === Number(id)));
+        const studentGrades = gradesRes.data.filter((g: any) => g.student_id === Number(id));
+        setGrades(studentGrades);
         setSubjects(subjectsRes.data);
         setExams(examsRes.data);
+        
+        // Auto-select most recent exam if available
+        const latestExamId = studentGrades.length > 0 
+          ? Math.max(...studentGrades.map((g: any) => g.exam_id).filter(Boolean)) 
+          : "";
+        if (latestExamId !== -Infinity && latestExamId) {
+          setSelectedExamId(latestExamId);
+        }
 
         if (studentRes.data.class_id) {
           const classRes = await api.get(`/classes/${studentRes.data.class_id}`);
@@ -102,6 +123,16 @@ export default function StudentProfilePage() {
 
     if (id) fetchProfile();
   }, [id]);
+
+  useEffect(() => {
+    if (selectedExamId) {
+      api.get(`/results/student/${id}?exam_id=${selectedExamId}`)
+        .then(res => setOverallResult(res.data))
+        .catch(() => setOverallResult(null));
+    } else {
+      setOverallResult(null);
+    }
+  }, [selectedExamId, id]);
 
   if (loading) {
     return <div className="flex justify-center py-12"><div className="text-gray-500">Loading profile...</div></div>;
@@ -136,10 +167,37 @@ export default function StudentProfilePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Attendance Rate" value={`${attendanceRate.toFixed(1)}%`} icon={ClipboardCheck} />
+        <StatCard 
+          title="Attendance Rate" 
+          value={`${attendanceRate.toFixed(1)}%`} 
+          icon={ClipboardCheck} 
+          trend={attendanceRate > 0 && attendanceRate < attendanceThreshold ? <span className="text-red-600 font-medium text-xs">At Risk (Below {attendanceThreshold}%)</span> : undefined}
+        />
         <StatCard title="Average Grade" value={`${avgGrade.toFixed(1)}%`} icon={TrendingUp} />
         <StatCard title="Enrolled Class" value={classInfo ? `${classInfo.name} ${classInfo.section || ''}` : "N/A"} icon={BookOpen} />
         <StatCard title="Status" value={student.status} icon={User} />
+      </div>
+
+      <div className="card">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+          <h2 className="text-lg font-semibold text-gray-900">Exam Results</h2>
+          <select
+            className="input-field w-full md:w-64"
+            value={selectedExamId}
+            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : "")}
+          >
+            <option value="">-- Select an Exam --</option>
+            {exams.map(ex => (
+              <option key={ex.id} value={ex.id}>{ex.title}</option>
+            ))}
+          </select>
+        </div>
+        
+        {selectedExamId ? (
+          <OverallResult result={overallResult} />
+        ) : (
+          <p className="text-gray-500 text-sm italic">Select an exam to view the overall result.</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -178,7 +236,7 @@ export default function StudentProfilePage() {
               <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-gray-900">Date of Birth</p>
-                <p className="text-sm text-gray-600">{student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString() : "N/A"}</p>
+                <p className="text-sm text-gray-600">{student.date_of_birth ? formatDate(student.date_of_birth) : "N/A"}</p>
               </div>
             </div>
           </div>
@@ -202,12 +260,11 @@ export default function StudentProfilePage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {grades.map(g => {
-                      const subj = subjects.find(s => s.id === g.subject_id);
                       const exam = exams.find(e => e.id === g.exam_id);
                       const pct = g.percentage ?? (g.marks_obtained / g.total_marks) * 100;
                       return (
                         <tr key={g.id}>
-                          <td className="px-4 py-3 text-sm text-gray-900">{subj?.name || "Unknown"}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{g.subject?.name || "Unknown"}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">{exam?.title || "General"}</td>
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">{g.marks_obtained} / {g.total_marks}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">{pct.toFixed(1)}%</td>
@@ -236,7 +293,7 @@ export default function StudentProfilePage() {
                   <tbody className="divide-y divide-gray-200">
                     {attendance.slice(0, 10).map(a => (
                       <tr key={a.id}>
-                        <td className="px-4 py-3 text-sm text-gray-900">{new Date(a.date).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatDate(a.date)}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             a.status === 'present' ? 'bg-green-100 text-green-800' :

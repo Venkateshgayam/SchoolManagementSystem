@@ -1,14 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Receipt, Calendar, CheckCircle, Wallet, Clock3, Percent, Plus, Save, Bell, Pencil } from "lucide-react";
+import { Receipt, Calendar, CheckCircle, Wallet, Clock3, Percent, Plus, Save, Bell, Pencil, Trash2 } from "lucide-react";
+import {   formatStudentNameId , formatDate } from "@/lib/formatters";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
+import PageLoader from "@/components/dashboard/PageLoader";
 import StatCard from "@/components/dashboard/StatCard";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Modal from "@/components/dashboard/Modal";
+import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import toast from "react-hot-toast";
 import { can } from "@/lib/permissions";
+import { useSettings } from "@/hooks/useSettings";
 
 interface FeeRecord { id: number; student_id: number; student_user_id: number | null; total_fee: number; amount_due: number; amount_paid: number; waiver_percentage: number; due_date: string | null; paid_date: string | null; status: string; academic_year: string | null; created_at: string; }
 
@@ -16,10 +20,14 @@ const STATUSES = ["unpaid", "paid", "partial", "overdue"];
 
 export default function FeesManager() {
   const [fees, setFees] = useState<FeeRecord[]>([]);
-  const [studentsList, setStudentsList] = useState<{ id: number; full_name?: string }[]>([]);
+  const [studentsList, setStudentsList] = useState<{ id: number; full_name?: string; roll_number?: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { settings } = useSettings();
+  const currencySymbol = settings.currency_symbol || "$";
+  
+  const formatCurrency = (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const [open, setOpen] = useState(false);
   const [savingNew, setSavingNew] = useState(false);
@@ -32,6 +40,9 @@ export default function FeesManager() {
 
   const [savingId, setSavingId] = useState<number | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<string>("");
+
+  const [deleteTarget, setDeleteTarget] = useState<FeeRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -56,7 +67,7 @@ export default function FeesManager() {
         student_id: newFee.student_id, 
         waiver_percentage: newFee.waiver_percentage ? Number(newFee.waiver_percentage) : 0, 
         due_date: newFee.due_date || null, 
-        academic_year: newFee.academic_year || null 
+        academic_year: settings.current_academic_year || "2026-27" 
       };
       const res = await api.post("/fees/", body);
       setFees([res.data, ...fees]);
@@ -108,13 +119,28 @@ export default function FeesManager() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/fees/${deleteTarget.id}`);
+      setFees(fees.filter((f) => f.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      toast.success("Fee record deleted");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to delete fee record");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const sendReminder = async (f: FeeRecord) => {
     if (!f.student_user_id) return toast.error("Student has no linked user account.");
     try {
       await api.post("/notifications/", {
         user_id: f.student_user_id,
         title: "Fee Payment Reminder",
-        message: `This is a reminder regarding your pending fee balance of ₹${f.amount_due}. Please ensure payment is made by ${f.due_date ? new Date(f.due_date).toLocaleDateString() : 'the required deadline'}.`,
+        message: `This is a reminder regarding your pending fee balance of ${formatCurrency(f.amount_due)}. Please ensure payment is made by ${f.due_date ? formatDate(f.due_date) : 'the required deadline'}.`,
         type: "fee_reminder"
       });
       toast.success("Reminder sent!");
@@ -129,7 +155,7 @@ export default function FeesManager() {
   const pending = fees.reduce((sum, f) => sum + (f.amount_due), 0);
   const collectionRate = expectedRevenue > 0 ? ((totalRevenue / expectedRevenue) * 100).toFixed(1) : "0.0";
 
-  if (loading) return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading fees…</div></div>;
+  if (loading) return <PageLoader label="Loading..." />;
   if (error) return (<div className="card max-w-lg mx-auto text-center py-8"><p className="text-gray-600 mb-4">{error}</p><button onClick={() => window.location.reload()} className="btn-primary">Retry</button></div>);
 
   return (
@@ -147,8 +173,8 @@ export default function FeesManager() {
         }
       />
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Collected Revenue" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(totalRevenue)} icon={Wallet} />
-        <StatCard title="Pending Amount" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(pending)} icon={Clock3} />
+        <StatCard title="Collected Revenue" value={formatCurrency(totalRevenue)} icon={Wallet} />
+        <StatCard title="Pending Amount" value={formatCurrency(pending)} icon={Clock3} />
         <StatCard title="Collection Rate" value={`${collectionRate}%`} icon={Percent} />
         <StatCard title="Total Records" value={fees.length} icon={Receipt} />
       </div>
@@ -177,12 +203,17 @@ export default function FeesManager() {
                 {can("fee:update") && <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>}
               </tr></thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filtered.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((f) => (
+                {filtered.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((f) => {
+                  const s = studentsList.find(st => st.id === f.student_id);
+                  return (
                   <tr key={f.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{f.student_id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(f.total_fee || 0)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(f.amount_due)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(f.amount_paid)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatStudentNameId(s?.full_name, f.student_id, s?.roll_number)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {formatCurrency(f.total_fee || 0)}
+                      {(f as any).late_fee_applied > 0 && <div className="text-xs text-red-500 mt-0.5">Includes {formatCurrency((f as any).late_fee_applied)} late fee</div>}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatCurrency(f.amount_due)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatCurrency(f.amount_paid)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-900">{f.total_fee > 0 ? ((f.amount_paid / f.total_fee) * 100).toFixed(0) : 0}%</span>
@@ -191,8 +222,8 @@ export default function FeesManager() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{f.due_date ? new Date(f.due_date).toLocaleDateString() : "—"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={f.status === "paid" ? "Fully Paid" : f.status === "partial" ? "Partially Paid" : "Unpaid"} /></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{f.due_date ? formatDate(f.due_date) : "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={f.status === "PAID" ? "Fully Paid" : f.status === "PARTIAL" ? "Partially Paid" : "Unpaid"} /></td>
                     {can("fee:update") && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         <div className="flex justify-end gap-3 items-center">
@@ -221,6 +252,14 @@ export default function FeesManager() {
                             </button>
                           )}
                           
+                          <button 
+                            onClick={() => setDeleteTarget(f)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            title="Delete Fee Record"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          
                           {f.status !== "paid" && (
                             <div className="flex items-center gap-1 border-l border-gray-200 pl-3 ml-1">
                               <input 
@@ -228,7 +267,7 @@ export default function FeesManager() {
                                 step="500" 
                                 min="0" 
                                 max="100000"
-                                placeholder="₹ Amount" 
+                                placeholder={`${currencySymbol} Amount`} 
                                 className="input w-24 px-2 py-1 text-xs" 
                                 value={savingId === f.id ? paymentAmount : ""} 
                                 onChange={(e) => { 
@@ -247,7 +286,8 @@ export default function FeesManager() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -274,7 +314,9 @@ export default function FeesManager() {
           </div>
           <div>
             <label className="label">Academic Year</label>
-            <input type="text" value={newFee.academic_year} onChange={(e) => setNewFee({ ...newFee, academic_year: e.target.value })} placeholder="e.g. 2025-2026" className="input w-full" />
+            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 font-medium cursor-not-allowed">
+              {settings.current_academic_year || "2026-27"}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -301,6 +343,15 @@ export default function FeesManager() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Fee Record"
+        message={`Are you sure you want to delete this fee record for ${studentsList.find(s => s.id === deleteTarget?.student_id)?.full_name || 'this student'}? This action cannot be undone.`}
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
