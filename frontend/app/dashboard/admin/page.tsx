@@ -10,16 +10,18 @@ import {
 import api from "@/lib/api";
 import StatCard from "@/components/dashboard/StatCard";
 import StatusBadge from "@/components/dashboard/StatusBadge";
-import {   formatStudentNameId, formatTeacherNameId , formatDate } from "@/lib/formatters";
+import { formatStudentNameId, formatTeacherNameId , formatDate } from "@/lib/formatters";
 import { useSettings } from "@/hooks/useSettings";
+import { calculateFeeSummary } from "@/lib/feeCalculations";
+import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
 
 interface StudentRecord { id: number; roll_number: string | null; class_id: number | null; status: string; full_name: string | null; }
 interface TeacherRecord { id: number; user_id: number; qualification: string | null; experience_years: number | null; full_name: string | null; }
-interface ClassRecord { id: number; name: string; section: string | null; teacher_id: number | null; }
+interface ClassRecord { id: number; name: string; section: string | null; teacher_id: number | null; fee_amount?: number; }
 interface SubjectRecord { id: number; name: string; code: string | null; }
 interface ScheduleRecord { id: number; class_id: number; subject_id: number; day_of_week: number; start_time: string; end_time: string; room: string | null; }
-interface AttendanceRecord { student_id: number; status: string; }
-interface FeeRecord { amount: number; status: string; }
+interface AttendanceRecord { student_id: number; status: string; date: string; }
+interface FeeRecord { id: number; student_id: number; total_fee: number; amount_paid: number; amount_due: number; waiver_percentage: number; status: string; academic_year: string | null; }
 interface LeaveRequestRecord { id: number; student_id: number | null; teacher_id: number | null; status: string; from_date: string; to_date: string; }
 interface ExamRecord { id: number; name: string; start_date: string | null; }
 interface AnnouncementRecord { id: number; title: string; content: string; is_pinned: boolean; created_at: string; }
@@ -72,18 +74,34 @@ export default function AdminDashboard() {
     fetchAll();
   }, []);
 
-  const attendanceRate =
-    attendance.length === 0 ? 0 :
-    // attendance.filter / attendance.length is a ratio; * 100 is a mathematical percentage-conversion constant
-    (attendance.filter((a) => a.status === "present").length / attendance.length) * 100;
+  const { rate: attendanceRate, present, late, absent } = calculateAttendanceStats(attendance);
   const attendanceThreshold: number = settings.attendance_at_risk_threshold ?? 75;
-  const attendanceTrend = attendance.length === 0
-    ? "No data yet"
-    : attendanceRate < attendanceThreshold
-      ? `⚠ Below ${attendanceThreshold}% threshold`
-      : `✓ Above ${attendanceThreshold}% threshold`;
-  const revenue = fees.reduce((sum, f) => sum + (f.status === "PAID" ? f.amount : 0), 0);
-  const pendingFees = fees.filter((f) => f.status === "PENDING" || f.status === "OVERDUE").length;
+  const attendanceTrend = (
+    <div className="flex flex-col text-xs mt-1">
+      <span className="text-gray-500">P: {present} | L: {late} | A: {absent}</span>
+      {attendanceRate > 0 && attendanceRate < attendanceThreshold ? (
+        <span className="text-red-600 font-medium mt-1">⚠ Below {attendanceThreshold}%</span>
+      ) : attendanceRate >= attendanceThreshold ? (
+        <span className="text-green-600 font-medium mt-1">✓ Above {attendanceThreshold}%</span>
+      ) : null}
+    </div>
+  );
+  const {
+    expectedRevenue,
+    revenue,
+    pendingAmount,
+    collectionRate,
+    paidCount,
+    pendingFeesCount,
+    activeStudentsCount,
+  } = calculateFeeSummary(
+    students,
+    classes as any[],
+    fees,
+    settings.current_academic_year || "2026-27"
+  );
+  const currencySymbol = settings.currency_symbol || "$";
+  const formatCurrency = (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const pendingLeaves = leaves.filter((l) => l.status === "PENDING");
   const upcomingExams = exams.filter((e) => e.start_date && new Date(e.start_date) >= new Date());
   const todaySchedules = schedules.filter((s) => s.day_of_week === today);
@@ -196,16 +214,25 @@ export default function AdminDashboard() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Fee Summary</h2>
           <div className="grid grid-cols-2 gap-4 text-center mb-4">
             <div>
-              <p className="text-2xl font-bold text-gray-900">{fees.filter((f) => f.status === "PAID").length}</p>
-              <p className="text-sm text-gray-500">Paid</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(revenue)}</p>
+              <p className="text-sm text-gray-500">Collected Revenue</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-danger-600">{pendingFees}</p>
-              <p className="text-sm text-gray-500">Pending/Overdue</p>
+              <p className="text-2xl font-bold text-danger-600">{formatCurrency(pendingAmount)}</p>
+              <p className="text-sm text-gray-500">Pending Amount</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{paidCount}</p>
+              <p className="text-sm text-gray-500">Fully Paid</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-600">{pendingFeesCount}</p>
+              <p className="text-sm text-gray-500">Pending/Partial</p>
             </div>
           </div>
-          <div className="border-t border-gray-100 pt-3 text-sm text-gray-600">
-            <span className="font-medium">{students.length}</span> students
+          <div className="border-t border-gray-100 pt-3 text-sm text-gray-600 flex items-center justify-between">
+            <span><span className="font-medium">{activeStudentsCount}</span> students</span>
+            <span className="font-medium text-primary-600">{collectionRate}% collected</span>
           </div>
         </div>
 

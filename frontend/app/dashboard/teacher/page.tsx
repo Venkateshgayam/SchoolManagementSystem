@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
 import PageLoader from "@/components/dashboard/PageLoader";
 import StatCard from "@/components/dashboard/StatCard";
-import { Users, BookOpen, ClipboardList, Calendar, Clock, MapPin } from "lucide-react";
+import { Users, BookOpen, ClipboardList, Calendar, Clock, MapPin, Megaphone, ArrowRight } from "lucide-react";
 import api from "@/lib/api";
 
 interface TeacherInfo {
@@ -212,6 +213,14 @@ export default function TeacherDashboard() {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
 
+  const teacherAnnouncements = announcements.filter(
+    (a) => a.target_role === "all" || a.target_role === "teachers" || a.target_role === null
+  );
+
+  const recentAnnouncements = [...teacherAnnouncements]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5);
+
   const unreadNotifications = teacherNotifications.filter((n) => !n.is_read).length;
 
   return (
@@ -276,6 +285,34 @@ export default function TeacherDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-primary-600" />
+              Announcements
+            </span>
+            <Link
+              href="/dashboard/teacher/announcements"
+              className="text-sm text-primary-600 hover:text-primary-500 flex items-center gap-1"
+            >
+              View All <ArrowRight className="h-3 w-3" />
+            </Link>
+          </h2>
+          {recentAnnouncements.length === 0 ? (
+            <p className="text-gray-600">No new announcements.</p>
+          ) : (
+            <div className="space-y-3">
+              {recentAnnouncements.map((a) => (
+                <div key={a.id} className="py-2 border-b border-gray-100 last:border-0">
+                  <p className="font-medium text-gray-900">{a.title}</p>
+                  <p className="text-sm text-gray-500">{a.content.slice(0, 100)}...</p>
+                  <p className="text-xs text-gray-400 mt-1">{formatDate(a.created_at)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">My Classes</h2>
           {teacherClasses.length === 0 ? (

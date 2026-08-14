@@ -19,7 +19,6 @@ interface ExamSubjectSlot {
 interface ExamRecord {
   id: number;
   name: string;
-  exam_type: string | null;
   academic_year: string | null;
   total_marks: number | null;
   slots: ExamSubjectSlot[];
@@ -43,7 +42,6 @@ export default function AdminExamsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [formName, setFormName] = useState("");
-  const [formExamType, setFormExamType] = useState("");
   const [formAcademicYear, setFormAcademicYear] = useState("");
   const [formTotalMarks, setFormTotalMarks] = useState("");
   const [formSlots, setFormSlots] = useState<Partial<ExamSubjectSlot>[]>([]);
@@ -71,7 +69,6 @@ export default function AdminExamsPage() {
 
   const resetForm = () => {
     setFormName("");
-    setFormExamType("");
     setFormAcademicYear("");
     setFormTotalMarks("");
     setFormSlots([]);
@@ -86,7 +83,6 @@ export default function AdminExamsPage() {
   const openEdit = (e: ExamRecord) => {
     setEditing(e);
     setFormName(e.name);
-    setFormExamType(e.exam_type || "");
     setFormAcademicYear(e.academic_year || "");
     setFormTotalMarks(e.total_marks ? String(e.total_marks) : "");
     setFormSlots(e.slots.map(s => {
@@ -149,7 +145,6 @@ export default function AdminExamsPage() {
 
       const payload = {
         name: formName,
-        exam_type: formExamType || null,
         academic_year: formAcademicYear || null,
         total_marks: formTotalMarks ? Number(formTotalMarks) : null,
         slots: slotsPayload
@@ -221,7 +216,6 @@ export default function AdminExamsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subjects</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -231,7 +225,6 @@ export default function AdminExamsPage() {
                 {exams.map((e) => (
                   <tr key={e.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><Tag className="h-4 w-4 inline mr-1 text-gray-400" />{e.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{e.exam_type || "—"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {e.slots.length} Subjects
@@ -273,16 +266,6 @@ export default function AdminExamsPage() {
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Exam Type</label>
-              <input
-                type="text"
-                value={formExamType}
-                onChange={(e) => setFormExamType(e.target.value)}
-                placeholder="e.g. Final"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">Academic Year</label>
               <input

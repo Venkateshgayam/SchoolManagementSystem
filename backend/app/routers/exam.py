@@ -130,13 +130,37 @@ async def get_exam(
 @router.post("/", response_model=ExamResponse)
 async def create_exam(
     request: ExamCreate,
-    current_user: dict = Depends(require_role("admin")),
+    current_user: dict = Depends(require_role("admin", "teacher")),
     db: AsyncSession = Depends(get_db)):
     from app.models.exam import ExamSubjectSlot
     exam_data = request.model_dump(exclude_unset=True)
     slots_data = exam_data.pop("slots", [])
     
+    role = current_user.get("role")
+    if role == "teacher":
+        from app.models.teacher import Teacher
+        teacher = await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
+        teacher = teacher.scalar_one_or_none()
+        if not teacher:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher profile not found")
+        
+        if slots_data:
+            subject_ids = [slot["subject_id"] for slot in slots_data]
+            from app.models.subject import teacher_subjects
+            valid_subjects = await db.execute(
+                select(teacher_subjects.c.subject_id)
+                .where(
+                    teacher_subjects.c.teacher_id == teacher.id,
+                    teacher_subjects.c.subject_id.in_(subject_ids)
+                )
+            )
+            valid_subject_ids = set(valid_subjects.scalars().all())
+            for sid in subject_ids:
+                if sid not in valid_subject_ids:
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Not assigned to subject ID {sid}")
+    
     exam = Exam(**exam_data)
+    exam.created_by = int(current_user["sub"])
     
     if exam.total_marks is None:
         from app.core.settings import get_setting
@@ -183,7 +207,7 @@ async def create_exam(
 async def update_exam(
     exam_id: int,
     request: ExamUpdate,
-    current_user: dict = Depends(require_role("admin")),
+    current_user: dict = Depends(require_role("admin", "teacher")),
     db: AsyncSession = Depends(get_db)):
     from app.models.exam import ExamSubjectSlot
     result = await db.execute(select(Exam).options(selectinload(Exam.slots)).where(Exam.id == exam_id))
@@ -191,8 +215,33 @@ async def update_exam(
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
         
+    role = current_user.get("role")
+    if role == "teacher" and exam.created_by != int(current_user["sub"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to modify this exam")
+
     update_data = request.model_dump(exclude_unset=True)
     slots_data = update_data.pop("slots", None)
+    
+    if role == "teacher" and slots_data:
+        from app.models.teacher import Teacher
+        teacher = await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
+        teacher = teacher.scalar_one_or_none()
+        if not teacher:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher profile not found")
+            
+        subject_ids = [slot["subject_id"] for slot in slots_data]
+        from app.models.subject import teacher_subjects
+        valid_subjects = await db.execute(
+            select(teacher_subjects.c.subject_id)
+            .where(
+                teacher_subjects.c.teacher_id == teacher.id,
+                teacher_subjects.c.subject_id.in_(subject_ids)
+            )
+        )
+        valid_subject_ids = set(valid_subjects.scalars().all())
+        for sid in subject_ids:
+            if sid not in valid_subject_ids:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Not assigned to subject ID {sid}")
     
     for key, value in update_data.items():
         setattr(exam, key, value)
@@ -236,12 +285,16 @@ async def update_exam(
 @router.delete("/{exam_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_exam(
     exam_id: int,
-    current_user: dict = Depends(require_role("admin")),
+    current_user: dict = Depends(require_role("admin", "teacher")),
     db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Exam).options(selectinload(Exam.slots)).where(Exam.id == exam_id))
     exam = result.scalar_one_or_none()
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+    role = current_user.get("role")
+    if role == "teacher" and exam.created_by != int(current_user["sub"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to modify this exam")
+        
     await db.delete(exam)
     await db.commit()
 

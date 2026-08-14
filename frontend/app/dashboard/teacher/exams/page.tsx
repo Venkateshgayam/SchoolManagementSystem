@@ -3,9 +3,12 @@ import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
 import React from "react";
-import { BookOpen, Users, Save, PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Paperclip, Award, FileText } from "lucide-react";
+import { BookOpen, Users, Save, PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Paperclip, Award, FileText, Plus, Tag, Pencil, X } from "lucide-react";
 import api from "@/lib/api";
 import { useSettings } from "@/hooks/useSettings";
+import Modal from "@/components/dashboard/Modal";
+import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
+import toast from "react-hot-toast";
 
 interface TeacherInfo {
   id: number;
@@ -55,7 +58,6 @@ interface ExamSubjectSlot {
 interface ExamInfo {
   id: number;
   name: string;
-  exam_type: string | null;
   academic_year: string | null;
   total_marks: number | null;
   slots: ExamSubjectSlot[];
@@ -75,6 +77,22 @@ export default function TeacherExamsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ExamInfo | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ExamInfo | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [formName, setFormName] = useState("");
+  const [formAcademicYear, setFormAcademicYear] = useState("");
+  const [formTotalMarks, setFormTotalMarks] = useState("");
+  const [formSlots, setFormSlots] = useState<Partial<ExamSubjectSlot>[]>([]);
+
+  const fetchExams = async () => {
+    const examsRes = await api.get("/exams/");
+    setExams(examsRes.data);
+  };
 
   useEffect(() => {
     async function fetchAll() {
@@ -110,6 +128,119 @@ export default function TeacherExamsPage() {
     setExpandedId(expandedId === slotId ? null : slotId);
   };
 
+  const isPast = (slots: ExamSubjectSlot[]) => slots.length > 0 && slots.some(s => new Date(s.start_time) < new Date());
+
+  const resetForm = () => {
+    setFormName("");
+    setFormAcademicYear("");
+    setFormTotalMarks("");
+    setFormSlots([]);
+    setEditing(null);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setOpen(true);
+  };
+
+  const openEdit = (e: ExamInfo) => {
+    setEditing(e);
+    setFormName(e.name);
+    setFormAcademicYear(e.academic_year || "");
+    setFormTotalMarks(e.total_marks ? String(e.total_marks) : "");
+    setFormSlots(e.slots.map(s => {
+      const dDate = new Date(s.date);
+      const dStart = new Date(s.start_time);
+      const dEnd = new Date(s.end_time);
+      return {
+        id: s.id,
+        subject_id: s.subject_id,
+        date: dDate.toLocaleDateString('en-CA'),
+        start_time: dStart.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        end_time: dEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      };
+    }));
+    setOpen(true);
+  };
+
+  const handleAddSlot = () => {
+    setFormSlots([...formSlots, { subject_id: 0, date: "", start_time: "", end_time: "" }]);
+  };
+
+  const handleRemoveSlot = (index: number) => {
+    setFormSlots(formSlots.filter((_, i) => i !== index));
+  };
+
+  const updateSlot = (index: number, field: keyof ExamSubjectSlot, value: any) => {
+    const updated = [...formSlots];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormSlots(updated);
+  };
+
+  const handleSubmit = async () => {
+    if (!formName) {
+      toast.error("Exam name is required.");
+      return;
+    }
+    
+    for (const slot of formSlots) {
+      if (!slot.subject_id || !slot.date || !slot.start_time || !slot.end_time) {
+        toast.error("Please fill all fields for all subject slots.");
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const slotsPayload = formSlots.map(s => {
+        const start = new Date(`${s.date}T${s.start_time}:00`);
+        const end = new Date(`${s.date}T${s.end_time}:00`);
+        const dateOnly = new Date(`${s.date}T00:00:00`);
+        
+        return {
+          subject_id: Number(s.subject_id),
+          date: dateOnly.toISOString(),
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+        };
+      });
+
+      const payload = {
+        name: formName,
+        academic_year: formAcademicYear || null,
+        total_marks: formTotalMarks ? Number(formTotalMarks) : null,
+        slots: slotsPayload
+      };
+
+      if (editing) {
+        await api.put(`/exams/${editing.id}`, payload);
+      } else {
+        await api.post("/exams/", payload);
+      }
+      setOpen(false);
+      resetForm();
+      await fetchExams();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to save exam");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/exams/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      await fetchExams();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to delete exam");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleGrade = async (submissionId: number) => {
     const val = gradeInputs[submissionId];
     if (!val || isNaN(Number(val))) return;
@@ -137,9 +268,67 @@ export default function TeacherExamsPage() {
     (exam.slots || []).map(slot => ({ ...slot, exam }))
   ).filter(slot => teacherSubjects.includes(slot.subject_id));
 
+  // Filter subjects down to only those taught by this teacher
+  const assignedSubjects = subjects.filter(s => s.teacher_id === teacher.id);
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Exam Submissions</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Exam Submissions</h1>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+          <Plus className="h-4 w-4" /> New Exam
+        </button>
+      </div>
+
+      <div className="card mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Award className="h-5 w-5" /> Managed Exams
+          </h2>
+        </div>
+        {exams.filter(e => e.slots.some(s => teacherSubjects.includes(s.subject_id))).length === 0 ? (
+          <p className="text-gray-500 text-sm">No exams found that include your subjects.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subjects</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {exams.filter(e => e.slots.some(s => teacherSubjects.includes(s.subject_id))).map((e) => (
+                  <tr key={e.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><Tag className="h-4 w-4 inline mr-1 text-gray-400" />{e.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {e.slots.length} Subjects
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Award className="h-4 w-4 inline mr-1 text-gray-400" />{e.academic_year || "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <button
+                        onClick={() => !isPast(e.slots) && openEdit(e)}
+                        className={`text-gray-500 hover:text-primary-600 mr-3 ${isPast(e.slots) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={isPast(e.slots) ? "Cannot edit — exam date has passed or started" : "Edit"}
+                        disabled={isPast(e.slots)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => setDeleteTarget(e)} className="text-gray-500 hover:text-red-600" title="Delete">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="card">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -315,6 +504,128 @@ export default function TeacherExamsPage() {
           </div>
         </div>
       )}
+
+      <Modal open={open} title={editing ? "Edit Exam" : "New Exam"} onClose={() => setOpen(false)}>
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Name</label>
+            <input
+              type="text"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder="e.g. Final Examination"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Academic Year</label>
+              <input
+                type="text"
+                value={formAcademicYear}
+                onChange={(e) => setFormAcademicYear(e.target.value)}
+                placeholder="e.g. 2025-2026"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Total Marks</label>
+              <input
+                type="number"
+                value={formTotalMarks}
+                onChange={(e) => setFormTotalMarks(e.target.value)}
+                placeholder="e.g. 100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-200 pt-4 mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-900">Subject Slots</h4>
+              <button onClick={handleAddSlot} className="text-primary-600 hover:text-primary-800 text-sm flex items-center gap-1 font-medium">
+                <PlusCircle className="h-4 w-4" /> Add Subject
+              </button>
+            </div>
+            
+            {formSlots.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                No subjects added to this exam yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {formSlots.map((slot, index) => (
+                  <div key={index} className="flex flex-col sm:flex-row gap-3 items-end bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <div className="w-full sm:w-1/3">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                      <select
+                        value={slot.subject_id || ""}
+                        onChange={(e) => updateSlot(index, "subject_id", e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      >
+                        <option value="">Select subject</option>
+                        {assignedSubjects.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-full sm:w-1/4">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                      <input
+                        type="date"
+                        value={slot.date || ""}
+                        onChange={(e) => updateSlot(index, "date", e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      />
+                    </div>
+                    <div className="w-full sm:w-1/5">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Start</label>
+                      <input
+                        type="time"
+                        value={slot.start_time || ""}
+                        onChange={(e) => updateSlot(index, "start_time", e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      />
+                    </div>
+                    <div className="w-full sm:w-1/5">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">End</label>
+                      <input
+                        type="time"
+                        value={slot.end_time || ""}
+                        onChange={(e) => updateSlot(index, "end_time", e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleRemoveSlot(index)}
+                      className="text-gray-400 hover:text-red-500 p-1.5"
+                      title="Remove Slot"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 mt-6 border-t border-gray-100">
+            <button onClick={() => setOpen(false)} disabled={saving} className="btn-secondary">Cancel</button>
+            <button onClick={handleSubmit} disabled={saving} className="btn-primary flex items-center gap-2">
+              <Save className="h-4 w-4" /> {saving ? "Saving…" : (editing ? "Update" : "Create")}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Exam"
+        message={`Are you sure you want to delete ${deleteTarget?.name}? This will also remove any student submissions associated with it. This action cannot be undone.`}
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

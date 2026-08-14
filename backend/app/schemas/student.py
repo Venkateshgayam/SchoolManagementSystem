@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
@@ -12,6 +12,8 @@ class StudentCreate(BaseModel):
     roll_number: Optional[str] = Field(None, max_length=50)
     class_id: Optional[int] = None
     parent_email: Optional[str] = Field(None, max_length=255)
+    address: Optional[str] = None
+    date_of_birth: Optional[date] = None
     enrollment_date: Optional[datetime] = None
     status: str = Field(default="active", max_length=20)
 
@@ -24,6 +26,8 @@ class StudentUpdate(BaseModel):
     roll_number: Optional[str] = Field(None, max_length=50)
     class_id: Optional[int] = None
     parent_email: Optional[str] = Field(None, max_length=255)
+    address: Optional[str] = None
+    date_of_birth: Optional[date] = None
     status: Optional[str] = Field(None, max_length=20)
     enrollment_date: Optional[datetime] = None
 
@@ -37,6 +41,8 @@ class StudentResponse(BaseModel):
     roll_number: Optional[str] = None
     class_id: Optional[int] = None
     parent_email: Optional[str] = None
+    address: Optional[str] = None
+    date_of_birth: Optional[date] = None
     enrollment_date: datetime
     status: str
     created_at: datetime

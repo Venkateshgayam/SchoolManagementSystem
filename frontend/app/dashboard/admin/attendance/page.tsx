@@ -5,6 +5,8 @@ import { ClipboardList, Calendar, Save } from "lucide-react";
 import { formatStudentNameId } from "@/lib/formatters";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
+import { can } from "@/lib/permissions";
+import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
 
 interface AttendanceRecord {
   id: number;
@@ -97,8 +99,7 @@ export default function AdminAttendancePage() {
     return cls ? `${cls.name} ${cls.section || ""}`.trim() : `Class #${classId}`;
   };
 
-  const attendanceRate = attendance.length === 0 ? 0 :
-    (attendance.filter((a) => a.status === "present").length / attendance.length) * 100;
+  const { rate: attendanceRate } = calculateAttendanceStats(attendance);
 
   const handleSave = async () => {
     if (!selectedClassId) {

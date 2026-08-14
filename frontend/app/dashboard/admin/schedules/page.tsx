@@ -8,6 +8,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import toast from "react-hot-toast";
+import { useSettings } from "@/hooks/useSettings";
 
 interface ScheduleRecord { id: number; class_id: number; subject_id: number; teacher_id: number | null; room: string | null; day_of_week: number; start_time: string; end_time: string; academic_year: string | null; created_at: string; }
 interface ClassRecord { id: number; name: string; section: string | null; }
@@ -34,10 +35,11 @@ export default function AdminSchedulesPage() {
   const [formSubjectId, setFormSubjectId] = useState<number | "">("");
   const [formTeacherId, setFormTeacherId] = useState<number | "">("");
   const [formRoom, setFormRoom] = useState("");
-  const [formDayOfWeek, setFormDayOfWeek] = useState<number | "">("");
+  const [formDate, setFormDate] = useState("");
   const [formStartTime, setFormStartTime] = useState("");
   const [formEndTime, setFormEndTime] = useState("");
-  const [formAcademicYear, setFormAcademicYear] = useState("");
+  
+  const { settings } = useSettings();
 
   const fetchData = async () => {
     try {
@@ -65,10 +67,9 @@ export default function AdminSchedulesPage() {
     setFormSubjectId("");
     setFormTeacherId("");
     setFormRoom("");
-    setFormDayOfWeek("");
+    setFormDate("");
     setFormStartTime("");
     setFormEndTime("");
-    setFormAcademicYear("");
     setEditing(null);
   };
 
@@ -83,31 +84,42 @@ export default function AdminSchedulesPage() {
     setFormSubjectId(s.subject_id);
     setFormTeacherId(s.teacher_id || "");
     setFormRoom(s.room || "");
-    setFormDayOfWeek(s.day_of_week);
+    setFormDate(""); // Date is only for creating or overriding the weekday
     setFormStartTime(s.start_time.substring(0, 5));
     setFormEndTime(s.end_time.substring(0, 5));
-    setFormAcademicYear(s.academic_year || "");
     setOpen(true);
   };
 
   const handleSubmit = async () => {
-    if (formClassId === "" || formSubjectId === "" || formDayOfWeek === "" || !formStartTime || !formEndTime) {
-      toast.error("Please fill in all required fields (Class, Subject, Day, Start Time, End Time).");
+    let dayOfWeekVal = editing ? editing.day_of_week : -1;
+    if (formDate) {
+      const d = new Date(formDate);
+      if (!isNaN(d.getTime())) {
+        dayOfWeekVal = (d.getDay() + 6) % 7;
+      }
+    }
+    
+    if (formClassId === "" || formSubjectId === "" || (!formDate && !editing) || !formStartTime || !formEndTime) {
+      toast.error("Please fill in all required fields (Class, Subject, Date, Start Time, End Time).");
       return;
     }
 
     setSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         class_id: Number(formClassId),
         subject_id: Number(formSubjectId),
         teacher_id: formTeacherId !== "" ? Number(formTeacherId) : null,
         room: formRoom || null,
-        day_of_week: Number(formDayOfWeek),
         start_time: formStartTime + ":00",
-        end_time: formEndTime + ":00",
-        academic_year: formAcademicYear || null
+        end_time: formEndTime + ":00"
       };
+      
+      if (formDate) {
+        payload.date = formDate;
+      } else if (editing) {
+        payload.day_of_week = editing.day_of_week;
+      }
 
       if (editing) {
         await api.put(`/schedules/${editing.id}`, payload);
@@ -258,18 +270,46 @@ export default function AdminSchedulesPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Day of Week *</label>
-              <select
-                value={formDayOfWeek}
-                onChange={(e) => setFormDayOfWeek(e.target.value === "" ? "" : Number(e.target.value))}
+              <label className="block text-sm font-medium text-gray-600 mb-1">Date *</label>
+              <input
+                type="date"
+                value={formDate}
+                onChange={(e) => setFormDate(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Select day</option>
-                {DAYS.map((d, i) => (
-                  <option key={i} value={i}>{d}</option>
-                ))}
-              </select>
+              />
+              {editing && <p className="text-xs text-gray-400 mt-1">Leave empty to keep existing day</p>}
             </div>
+            
+            {/* Display the derived Day (Read-only) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Day</label>
+              <input
+                type="text"
+                readOnly
+                value={(() => {
+                  if (formDate) {
+                    const [y, m, d] = formDate.split('-');
+                    const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+                    if (!isNaN(dateObj.getTime())) return DAYS[(dateObj.getDay() + 6) % 7];
+                  }
+                  if (editing) return DAYS[editing.day_of_week];
+                  return "Select a date";
+                })()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
+              />
+            </div>
+            
+            {/* Display the Academic Year (Read-only) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Academic Year</label>
+              <input
+                type="text"
+                readOnly
+                value={editing && editing.academic_year ? editing.academic_year : (settings.current_academic_year || "Loading...")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
+              />
+            </div>
+            
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">Start Time *</label>
               <input
@@ -288,17 +328,6 @@ export default function AdminSchedulesPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Academic Year</label>
-            <input
-              type="text"
-              value={formAcademicYear}
-              onChange={(e) => setFormAcademicYear(e.target.value)}
-              placeholder="e.g. 2024-2025"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
           </div>
           
           <div className="flex justify-end gap-2 pt-4 mt-6 border-t border-gray-100">

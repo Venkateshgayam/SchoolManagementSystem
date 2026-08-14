@@ -27,6 +27,8 @@ def _to_response(student: Student) -> StudentResponse:
         roll_number=student.roll_number,
         class_id=student.class_id,
         parent_email=student.parent_email,
+        address=student.address,
+        date_of_birth=student.date_of_birth,
         enrollment_date=student.enrollment_date,
         status=student.status,
         created_at=student.created_at,
@@ -133,8 +135,13 @@ async def create_student(
         roll_number=request.roll_number,
         class_id=request.class_id,
         parent_email=request.parent_email,
-        enrollment_date=request.enrollment_date,
+        address=request.address,
+        date_of_birth=request.date_of_birth,
+        enrollment_date=request.enrollment_date if request.enrollment_date else None,
         status=request.status)
+    if not student.enrollment_date:
+        from datetime import datetime, timezone
+        student.enrollment_date = datetime.now(timezone.utc)
     db.add(student)
     await db.commit()
     
@@ -181,7 +188,7 @@ async def update_student(
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
 
-    profile_fields = {"roll_number", "class_id", "parent_email", "status", "enrollment_date"}
+    profile_fields = {"roll_number", "class_id", "parent_email", "address", "date_of_birth", "status", "enrollment_date"}
     for key, value in data.items():
         if key in profile_fields:
             setattr(student, key, value)

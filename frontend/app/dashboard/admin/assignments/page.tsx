@@ -30,6 +30,7 @@ interface SubjectRecord {
   id: number;
   name: string;
   code: string | null;
+  teacher_ids?: number[];
 }
 interface TeacherRecord {
   id: number;
@@ -318,7 +319,10 @@ export default function AdminAssignmentsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">No teacher</option>
-                {teachers.map((t) => (
+                {(formSubjectId 
+                  ? teachers.filter(t => subjects.find(s => s.id === formSubjectId)?.teacher_ids?.includes(t.id)) 
+                  : teachers
+                ).map((t) => (
                   <option key={t.id} value={t.id}>{formatTeacherNameId(t.full_name, t.id)}</option>
                 ))}
               </select>

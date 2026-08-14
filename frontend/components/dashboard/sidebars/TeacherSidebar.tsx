@@ -15,6 +15,7 @@ import {
   BarChart3,
   CalendarDays,
   Bell,
+  Megaphone,
   Key,
 } from "lucide-react";
 
@@ -25,8 +26,8 @@ const menuItems = [
   { href: "/dashboard/teacher/attendance", label: "Attendance", icon: ClipboardList },
   { href: "/dashboard/teacher/assignments", label: "Assignments", icon: FileText },
   { href: "/dashboard/teacher/exams", label: "Examinations", icon: Award },
-  { href: "/dashboard/teacher/grades", label: "Grades", icon: BarChart3 },
   { href: "/dashboard/teacher/schedule", label: "Schedule", icon: CalendarDays },
+  { href: "/dashboard/teacher/announcements", label: "Announcements", icon: Megaphone },
   { href: "/dashboard/teacher/leave-requests", label: "Leave Requests", icon: CalendarDays },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
 ];

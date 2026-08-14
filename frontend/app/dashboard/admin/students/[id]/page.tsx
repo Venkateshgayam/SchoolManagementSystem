@@ -8,11 +8,15 @@ import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
 import Link from "next/link";
+import { formatStudentNameId, formatTeacherNameId } from "@/lib/formatters";
 import OverallResult, { OverallResultData } from "@/components/dashboard/OverallResult";
+import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
 
 interface StudentProfile {
   id: number;
   user_id: number;
+  full_name: string | null;
+  email: string | null;
   roll_number: string | null;
   class_id: number | null;
   parent_email: string | null;
@@ -143,8 +147,7 @@ export default function StudentProfilePage() {
     );
   }
 
-  const attendanceRate = attendance.length === 0 ? 0 :
-    (attendance.filter((a) => a.status === "present").length / attendance.length) * 100;
+  const { rate: attendanceRate, present, late, absent } = calculateAttendanceStats(attendance);
   
   const avgGrade = grades.length === 0 ? 0 :
     grades.reduce((sum, g) => sum + (g.percentage ?? (g.marks_obtained / g.total_marks) * 100), 0) / grades.length;
@@ -156,14 +159,23 @@ export default function StudentProfilePage() {
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </Link>
         <PageHeader 
-          title={`${student.user?.first_name || 'Student'} ${student.user?.last_name || ''}`}
+          title={student.full_name || `${student.user?.first_name || 'Student'} ${student.user?.last_name || ''}`}
           subtitle={`Roll No: ${student.roll_number || 'N/A'}`}
           icon={User}
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Attendance Rate" value={`${attendanceRate.toFixed(1)}%`} icon={ClipboardCheck} />
+        <StatCard 
+          title="Attendance Rate" 
+          value={`${attendanceRate.toFixed(1)}%`} 
+          icon={ClipboardCheck} 
+          trend={
+            <div className="flex flex-col text-xs text-gray-500 mt-1">
+              <span>Present: {present} | Late: {late} | Absent: {absent}</span>
+            </div>
+          }
+        />
         <StatCard title="Average Grade" value={`${avgGrade.toFixed(1)}%`} icon={TrendingUp} />
         <StatCard title="Enrolled Class" value={classInfo ? `${classInfo.name} ${classInfo.section || ''}` : "N/A"} icon={BookOpen} />
         <StatCard title="Status" value={student.status} icon={User} />
@@ -199,7 +211,7 @@ export default function StudentProfilePage() {
               <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-gray-900">Student Email</p>
-                <p className="text-sm text-gray-600">{student.user?.email || "N/A"}</p>
+                <p className="text-sm text-gray-600">{student.email || student.user?.email || "N/A"}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">

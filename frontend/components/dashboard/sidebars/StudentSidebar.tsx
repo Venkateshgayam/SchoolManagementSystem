@@ -20,7 +20,6 @@ const menuItems = [
   { href: "/dashboard/student", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/student/assignments", label: "Assignments", icon: FileText },
   { href: "/dashboard/student/exams", label: "Examinations", icon: Award },
-  { href: "/dashboard/student/grades", label: "Grades", icon: BookOpen },
   { href: "/dashboard/student/attendance", label: "Attendance", icon: CalendarDays },
   { href: "/dashboard/student/fees", label: "Fees", icon: Banknote },
   { href: "/dashboard/student/leave-requests", label: "Leave Requests", icon: CalendarDays },

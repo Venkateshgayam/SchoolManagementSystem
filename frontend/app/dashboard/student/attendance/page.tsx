@@ -4,6 +4,8 @@ import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
 import { ClipboardList, Calendar, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
+import StatusBadge from "@/components/dashboard/StatusBadge";
+import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
 
 interface AttendanceRecord {
   id: number;
@@ -52,11 +54,8 @@ export default function StudentAttendancePage() {
     fetchAttendance();
   }, []);
 
-  const total = attendance.length;
-  const present = attendance.filter((r) => r.status === "present").length;
-  const absent = attendance.filter((r) => r.status === "absent").length;
-  const late = attendance.filter((r) => r.status === "late").length;
-  const attendancePercent = total > 0 ? Math.round((present / total) * 100) : 0;
+  const { total, present, absent, late, rate: attendancePercent } = calculateAttendanceStats(attendance);
+  const formattedPercent = Math.round(attendancePercent);
 
   if (loading) {
     return (
@@ -84,7 +83,7 @@ export default function StudentAttendancePage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Overall</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{attendancePercent}%</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900">{formattedPercent}%</p>
         </div>
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Present</p>

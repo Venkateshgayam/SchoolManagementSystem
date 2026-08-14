@@ -30,7 +30,6 @@ const menuItems = [
   { href: "/dashboard/admin/subjects", label: "Subjects", icon: BookOpen },
   { href: "/dashboard/admin/schedules", label: "Schedules", icon: Clock },
   { href: "/dashboard/admin/attendance", label: "Attendance", icon: ClipboardList },
-  { href: "/dashboard/admin/grades", label: "Grades", icon: BarChart3 },
   { href: "/dashboard/admin/exams", label: "Examinations", icon: Award },
   { href: "/dashboard/admin/assignments", label: "Assignments", icon: FileText },
   { href: "/dashboard/admin/fees", label: "Fees", icon: Wallet },

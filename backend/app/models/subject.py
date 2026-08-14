@@ -1,7 +1,15 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, ForeignKey, Text, DateTime
+from sqlalchemy import String, Integer, ForeignKey, Text, DateTime, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base
+
+
+teacher_subjects = Table(
+    "teacher_subjects",
+    Base.metadata,
+    Column("teacher_id", Integer, ForeignKey("teachers.id", ondelete="CASCADE"), primary_key=True),
+    Column("subject_id", Integer, ForeignKey("subjects.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Subject(Base):
@@ -12,12 +20,16 @@ class Subject(Base):
     code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     school_id: Mapped[int | None] = mapped_column(ForeignKey("schools.id", ondelete="SET NULL"), nullable=True)
-    teacher_id: Mapped[int | None] = mapped_column(ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     school = relationship("School", backref="subjects")
-    teacher = relationship("Teacher", backref="subjects")
+    teachers = relationship("Teacher", secondary=teacher_subjects, backref="subjects")
+
+    @property
+    def teacher_ids(self) -> list[int]:
+        return [t.id for t in self.teachers] if self.teachers else []
 
     def __repr__(self) -> str:
         return f"<Subject(id={self.id}, name={self.name}, code={self.code})>"

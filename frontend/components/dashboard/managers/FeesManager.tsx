@@ -13,6 +13,8 @@ import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import toast from "react-hot-toast";
 import { can } from "@/lib/permissions";
 import { useSettings } from "@/hooks/useSettings";
+import { useRouter } from "next/navigation";
+import { calculateFeeSummary } from "@/lib/feeCalculations";
 
 interface FeeRecord { id: number; student_id: number; student_user_id: number | null; total_fee: number; amount_due: number; amount_paid: number; waiver_percentage: number; due_date: string | null; paid_date: string | null; status: string; academic_year: string | null; created_at: string; }
 
@@ -20,11 +22,13 @@ const STATUSES = ["unpaid", "paid", "partial", "overdue"];
 
 export default function FeesManager() {
   const [fees, setFees] = useState<FeeRecord[]>([]);
-  const [studentsList, setStudentsList] = useState<{ id: number; full_name?: string; roll_number?: string | null }[]>([]);
+  const [studentsList, setStudentsList] = useState<{ id: number; full_name?: string; roll_number?: string | null; class_id: number | null; status: string }[]>([]);
+  const [classesList, setClassesList] = useState<{ id: number; fee_amount: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { settings } = useSettings();
+  const router = useRouter();
   const currencySymbol = settings.currency_symbol || "$";
   
   const formatCurrency = (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -46,12 +50,14 @@ export default function FeesManager() {
 
   useEffect(() => {
     Promise.all([
-      api.get("/fees/"),
-      can("fee:create") ? api.get("/students/").catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+      api.get("/fees/").catch(() => ({ data: [] })),
+      api.get("/students/").catch(() => ({ data: [] })),
+      api.get("/classes/").catch(() => ({ data: [] }))
     ])
-      .then(([resFees, resStudents]) => {
+      .then(([resFees, resStudents, resClasses]) => {
         setFees(resFees.data);
         if (resStudents.data) setStudentsList(resStudents.data);
+        if (resClasses.data) setClassesList(resClasses.data);
       })
       .catch((err) => setError(err?.message || "Failed to load fees"))
       .finally(() => setLoading(false));
@@ -74,6 +80,7 @@ export default function FeesManager() {
       setOpen(false);
       setNewFee({ student_id: null, waiver_percentage: "", due_date: "", academic_year: "" });
       toast.success("Fee record created");
+      router.refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || "Failed to create fee");
     } finally {
@@ -93,6 +100,7 @@ export default function FeesManager() {
       setFees(fees.map((record) => record.id === f.id ? res.data : record));
       setPaymentAmount("");
       toast.success("Payment recorded");
+      router.refresh();
     } catch (err: any) { 
       toast.error(err?.response?.data?.detail || err?.message || "Could not record payment"); 
     } finally { 
@@ -112,6 +120,7 @@ export default function FeesManager() {
       setFees(fees.map((record) => record.id === editFeeId ? res.data : record));
       setEditOpen(false);
       toast.success("Fee record updated");
+      router.refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || "Failed to update fee");
     } finally {
@@ -127,6 +136,7 @@ export default function FeesManager() {
       setFees(fees.filter((f) => f.id !== deleteTarget.id));
       setDeleteTarget(null);
       toast.success("Fee record deleted");
+      router.refresh();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || "Failed to delete fee record");
     } finally {
@@ -150,10 +160,17 @@ export default function FeesManager() {
   };
 
   const filtered = statusFilter === "all" ? fees : fees.filter((f) => f.status === statusFilter);
-  const totalRevenue = fees.reduce((sum, f) => sum + f.amount_paid, 0);
-  const expectedRevenue = fees.reduce((sum, f) => sum + (f.total_fee || 0), 0);
-  const pending = fees.reduce((sum, f) => sum + (f.amount_due), 0);
-  const collectionRate = expectedRevenue > 0 ? ((totalRevenue / expectedRevenue) * 100).toFixed(1) : "0.0";
+  const {
+    expectedRevenue,
+    revenue: totalRevenue,
+    pendingAmount: pending,
+    collectionRate,
+  } = calculateFeeSummary(
+    studentsList,
+    classesList,
+    fees,
+    settings.current_academic_year || "2026-27"
+  );
 
   if (loading) return <PageLoader label="Loading..." />;
   if (error) return (<div className="card max-w-lg mx-auto text-center py-8"><p className="text-gray-600 mb-4">{error}</p><button onClick={() => window.location.reload()} className="btn-primary">Retry</button></div>);

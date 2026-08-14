@@ -9,6 +9,8 @@ from app.models.teacher import Teacher
 from app.models.class_model import Class
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 from app.core.dependencies import require_role, get_current_active_user, get_current_student
+from app.core.settings import get_setting
+from datetime import datetime
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -68,7 +70,26 @@ async def create_schedule(
     request: ScheduleCreate,
     current_user: dict = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db)):
-    schedule = Schedule(**request.model_dump(exclude_unset=True))
+    data = request.model_dump(exclude_unset=True)
+    
+    # 1. Enforce Academic Year from Settings
+    current_academic_year = await get_setting(db, "current_academic_year", "2026-27")
+    data["academic_year"] = current_academic_year
+    
+    # 2. Derive day_of_week from date if provided
+    if "date" in data:
+        date_str = data.pop("date")
+        if date_str:
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                data["day_of_week"] = parsed_date.weekday()  # 0=Monday, 6=Sunday
+            except ValueError:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD")
+                
+    if "day_of_week" not in data or data["day_of_week"] is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date or day_of_week is required")
+        
+    schedule = Schedule(**data)
     db.add(schedule)
     await db.commit()
     await db.refresh(schedule)
@@ -85,9 +106,27 @@ async def update_schedule(
     schedule = result.scalar_one_or_none()
     if not schedule:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+        
     update_data = request.model_dump(exclude_unset=True)
+    
+    # Enforce derived day_of_week if date is provided
+    if "date" in update_data:
+        date_str = update_data.pop("date")
+        if date_str:
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                update_data["day_of_week"] = parsed_date.weekday()
+            except ValueError:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD")
+                
+    # Do not allow modifying academic_year manually via update unless it's a specific system requirement
+    # We will ignore academic_year if sent in update to preserve existing schedule
+    if "academic_year" in update_data:
+        update_data.pop("academic_year")
+        
     for key, value in update_data.items():
         setattr(schedule, key, value)
+        
     await db.commit()
     await db.refresh(schedule)
     return schedule

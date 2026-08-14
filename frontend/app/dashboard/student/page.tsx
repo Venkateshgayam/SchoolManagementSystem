@@ -7,6 +7,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import { BookOpen, CreditCard, ClipboardList, FileText, AlertCircle, Clock, Bell, TrendingUp, AlertTriangle } from "lucide-react";
 import api from "@/lib/api";
 import { useSettings } from "@/hooks/useSettings";
+import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
 
 interface AttendanceRecord {
   id: number;
@@ -42,7 +43,6 @@ interface AssignmentRecord {
 interface ExamRecord {
   id: number;
   name: string;
-  exam_type: string | null;
   start_date: string | null;
   end_date: string | null;
   academic_year: string | null;
@@ -227,9 +227,7 @@ export default function StudentDashboard() {
     );
   }
 
-  const totalAttendance = attendanceData.length;
-  const presentCount = attendanceData.filter((r) => r.status === "present").length;
-  const attendancePercent = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
+  const { rate: attendancePercent, present, late, absent } = calculateAttendanceStats(attendanceData);
 
   const totalFees = feesData.reduce((sum, f) => sum + f.amount, 0);
   const paidFees = feesData.filter((f) => f.status === "PAID").reduce((sum, f) => sum + f.amount, 0);
@@ -265,13 +263,14 @@ const dayMap: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 
           value={`${attendancePercent}%`}
           icon={ClipboardList}
           trend={
-            attendancePercent < attendanceThreshold ? (
-              <span className="flex items-center text-red-600 font-medium">
-                <AlertTriangle className="h-3 w-3 mr-1" /> Below {attendanceThreshold}%
-              </span>
-            ) : (
-              `${presentCount} present`
-            )
+            <div className="flex flex-col text-xs text-gray-500 mt-1">
+              <span>P: {present} | L: {late} | A: {absent}</span>
+              {attendancePercent < attendanceThreshold && (
+                <span className="flex items-center text-red-600 font-medium mt-1">
+                  <AlertTriangle className="h-3 w-3 mr-1" /> Below {attendanceThreshold}%
+                </span>
+              )}
+            </div>
           }
         />
         <StatCard
@@ -345,7 +344,6 @@ const dayMap: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 
                   <div>
                     <p className="font-medium text-gray-900">{e.name}</p>
                     <p className="text-sm text-gray-500">
-                      {e.exam_type && `${e.exam_type} · `}
                       {e.start_date && formatDate(e.start_date)}
                     </p>
                   </div>

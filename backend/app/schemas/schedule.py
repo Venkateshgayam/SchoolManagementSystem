@@ -8,7 +8,8 @@ class ScheduleCreate(BaseModel):
     subject_id: int
     teacher_id: Optional[int] = None
     room: Optional[str] = Field(None, max_length=50)
-    day_of_week: int = Field(..., ge=0, le=6)
+    day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    date: Optional[str] = None
     start_time: time
     end_time: time
     academic_year: Optional[str] = Field(None, max_length=20)
@@ -20,6 +21,7 @@ class ScheduleUpdate(BaseModel):
     teacher_id: Optional[int] = None
     room: Optional[str] = Field(None, max_length=50)
     day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    date: Optional[str] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     academic_year: Optional[str] = Field(None, max_length=20)

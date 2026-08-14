@@ -12,7 +12,7 @@ import toast from "react-hot-toast";
 
 interface AnnouncementRecord { id: number; title: string; content: string; created_by: number | null; target_role: string | null; created_at: string; expires_at: string | null; is_pinned: boolean; }
 
-const TARGET_ROLES = ["all", "student", "teacher", "admin"];
+const TARGET_ROLES = ["all", "students", "teachers", "admin"];
 
 export default function AdminAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);

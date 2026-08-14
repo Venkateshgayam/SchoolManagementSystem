@@ -2,6 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.database.database import get_db
 from app.models.subject import Subject
 from app.models.teacher import Teacher
@@ -34,9 +35,9 @@ async def list_subjects(
         subject_ids = await _teacher_subject_ids(db, current_user)
         if not subject_ids:
             return []
-        result = await db.execute(select(Subject).where(Subject.id.in_(subject_ids)))
+        result = await db.execute(select(Subject).options(selectinload(Subject.teachers)).where(Subject.id.in_(subject_ids)))
     else:
-        result = await db.execute(select(Subject))
+        result = await db.execute(select(Subject).options(selectinload(Subject.teachers)))
     subjects = result.scalars().all()
     return subjects
 
@@ -46,7 +47,7 @@ async def get_subject(
     subject_id: int,
     current_user: dict = Depends(require_role("admin", "teacher", "student")),
     db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    result = await db.execute(select(Subject).options(selectinload(Subject.teachers)).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
@@ -62,10 +63,27 @@ async def create_subject(
     request: SubjectCreate,
     current_user: dict = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db)):
-    subject = Subject(**request.model_dump(exclude_unset=True))
+    data = request.model_dump(exclude_unset=True)
+    teacher_ids = data.pop("teacher_ids", [])
+    
+    subject = Subject(**data)
+    
+    if teacher_ids:
+        teachers_result = await db.execute(
+            select(Teacher).options(selectinload(Teacher.subjects)).where(Teacher.id.in_(teacher_ids))
+        )
+        teachers = list(teachers_result.scalars().all())
+        for t in teachers:
+            if t.subjects:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Teacher {t.id} is already assigned to subject '{t.subjects[0].name}'"
+                )
+        subject.teachers = teachers
+        
     db.add(subject)
     await db.commit()
-    await db.refresh(subject)
+    await db.refresh(subject, ["teachers"])
     
     await write_audit_log(
         db,
@@ -85,15 +103,33 @@ async def update_subject(
     request: SubjectUpdate,
     current_user: dict = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    result = await db.execute(select(Subject).options(selectinload(Subject.teachers)).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+    
     update_data = request.model_dump(exclude_unset=True)
+    if "teacher_ids" in update_data:
+        teacher_ids = update_data.pop("teacher_ids")
+        if teacher_ids is not None:
+            teachers_result = await db.execute(
+                select(Teacher).options(selectinload(Teacher.subjects)).where(Teacher.id.in_(teacher_ids))
+            )
+            teachers = list(teachers_result.scalars().all())
+            for t in teachers:
+                other_subjects = [s for s in t.subjects if s.id != subject_id]
+                if other_subjects:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Teacher {t.id} is already assigned to subject '{other_subjects[0].name}'"
+                    )
+            subject.teachers = teachers
+            
     for key, value in update_data.items():
         setattr(subject, key, value)
+        
     await db.commit()
-    await db.refresh(subject)
+    await db.refresh(subject, ["teachers"])
 
     await write_audit_log(
         db,
@@ -135,18 +171,35 @@ async def assign_teacher_to_subject(
     teacher_id: int,
     current_user: dict = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    result = await db.execute(select(Subject).options(selectinload(Subject.teachers)).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
-    # Update teacher_id directly on the subject
-    subject.teacher_id = teacher_id
+    
+    teacher_result = await db.execute(
+        select(Teacher).options(selectinload(Teacher.subjects)).where(Teacher.id == teacher_id)
+    )
+    teacher = teacher_result.scalar_one_or_none()
+    if not teacher:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+        
+    other_subjects = [s for s in teacher.subjects if s.id != subject_id]
+    if other_subjects:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Teacher {teacher.id} is already assigned to subject '{other_subjects[0].name}'"
+        )
+        
+    if teacher not in subject.teachers:
+        subject.teachers.append(teacher)
+        
     # Update any existing schedules for this subject to use the given teacher
+    # Assuming this assignment updates schedules without breaking M2M logic
     await db.execute(
         Schedule.__table__.update().where(Schedule.subject_id == subject_id).values(teacher_id=teacher_id)
     )
     await db.commit()
-    await db.refresh(subject)
+    await db.refresh(subject, ["teachers"])
 
     await write_audit_log(
         db,

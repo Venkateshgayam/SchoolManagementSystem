@@ -24,6 +24,8 @@ interface StudentRecord {
   roll_number: string | null;
   class_id: number | null;
   parent_email: string | null;
+  address: string | null;
+  date_of_birth: string | null;
   enrollment_date: string;
   status: string;
 }
@@ -42,6 +44,8 @@ interface FormState {
   roll_number: string;
   class_id: number | "";
   parent_email: string;
+  address: string;
+  date_of_birth: string;
   enrollment_date: string;
   status: string;
 }
@@ -54,6 +58,8 @@ const EMPTY_FORM: FormState = {
   roll_number: "",
   class_id: "",
   parent_email: "",
+  address: "",
+  date_of_birth: "",
   enrollment_date: "",
   status: "active",
 };
@@ -131,6 +137,8 @@ export default function StudentsManager() {
       roll_number: student.roll_number || "",
       class_id: student.class_id ?? "",
       parent_email: student.parent_email || "",
+      address: student.address || "",
+      date_of_birth: student.date_of_birth ? student.date_of_birth.slice(0, 10) : "",
       enrollment_date: student.enrollment_date ? student.enrollment_date.slice(0, 10) : "",
       status: student.status,
     });
@@ -168,6 +176,8 @@ export default function StudentsManager() {
         roll_number: form.roll_number || null,
         class_id: form.class_id === "" ? null : form.class_id,
         parent_email: form.parent_email || null,
+        address: form.address || null,
+        date_of_birth: form.date_of_birth || null,
         enrollment_date: form.enrollment_date || null,
         status: form.status,
       };
@@ -341,6 +351,14 @@ export default function StudentsManager() {
             <div>
               <label className="label">Parent Email</label>
               <input type="email" value={form.parent_email} onChange={(e) => setForm({ ...form, parent_email: e.target.value })} placeholder="parent@example.com" className="input-field" />
+            </div>
+            <div>
+              <label className="label">Address</label>
+              <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="e.g. 123 Main St, City" className="input-field" />
+            </div>
+            <div>
+              <label className="label">Date of Birth</label>
+              <input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} className="input-field" />
             </div>
             <div>
               <label className="label">Enrollment Date</label>

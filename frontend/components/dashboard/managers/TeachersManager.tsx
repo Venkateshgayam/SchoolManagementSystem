@@ -48,6 +48,7 @@ const EMPTY_FORM: FormState = {
 export default function TeachersManager() {
   const [perm, setPerm] = useState({ create: false, update: false, del: false });
   const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
+  const [subjects, setSubjects] = useState<{ id: number; name: string; teacher_ids: number[] }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -65,8 +66,12 @@ export default function TeachersManager() {
   }, []);
 
   const fetchData = async () => {
-    const res = await api.get("/teachers/");
-    setTeachers(res.data);
+    const [resTeachers, resSubjects] = await Promise.all([
+      api.get("/teachers/"),
+      api.get("/subjects/")
+    ]);
+    setTeachers(resTeachers.data);
+    setSubjects(resSubjects.data);
   };
 
   useEffect(() => {
@@ -342,6 +347,23 @@ export default function TeachersManager() {
               <div>
                 <p className="text-sm text-gray-500">Employment Date</p>
                 <p className="font-medium">{viewDetailsTarget.employment_date ? formatDate(viewDetailsTarget.employment_date) : "N/A"}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-gray-500 mb-1">Assigned Subjects</p>
+                {(() => {
+                  const teacherSubjects = subjects.filter(s => s.teacher_ids && s.teacher_ids.includes(viewDetailsTarget.id));
+                  return teacherSubjects.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {teacherSubjects.map(s => (
+                        <span key={s.id} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-md border border-blue-100">
+                          {s.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm italic text-gray-400">No subjects assigned</p>
+                  );
+                })()}
               </div>
             </div>
             <div className="flex justify-end pt-4">

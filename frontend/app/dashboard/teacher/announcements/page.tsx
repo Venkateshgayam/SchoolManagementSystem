@@ -53,7 +53,7 @@ export default function TeacherAnnouncementsPage() {
   const myAnnouncements = announcements.filter((a) => {
     if (!teacher) return false;
     if (a.created_by === teacher.user_id) return true;
-    return a.target_role === "all" || a.target_role === "teacher";
+    return a.target_role === "all" || a.target_role === "teachers" || a.target_role === null;
   });
 
   const resetForm = () => {
@@ -151,9 +151,8 @@ export default function TeacherAnnouncementsPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">All Users</option>
-              <option value="teacher">Teachers</option>
-              <option value="student">Students</option>
-              <option value="parent">Parents</option>
+              <option value="teachers">Teachers</option>
+              <option value="students">Students</option>
               <option value="admin">Admin</option>
 
             </select>

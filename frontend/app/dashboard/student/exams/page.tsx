@@ -16,7 +16,6 @@ interface ExamSubjectSlot {
 interface ExamRecord {
   id: number;
   name: string;
-  exam_type: string | null;
   academic_year: string | null;
   slots: ExamSubjectSlot[];
 }
@@ -167,7 +166,7 @@ export default function StudentExamsPage() {
                         <AlertCircle className="h-5 w-5 text-primary-600" />
                         <h3 className="font-bold text-gray-900">{slot.exam.name} - {getSubjectName(slot.subject_id)}</h3>
                       </div>
-                      <p className="text-sm text-gray-500 mb-3">{slot.exam.exam_type || "General"} | {slot.exam.academic_year}</p>
+                      <p className="text-sm text-gray-500 mb-3">{slot.exam.academic_year}</p>
                       
                       <div className="flex flex-col sm:flex-row gap-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
                         <p className="flex items-center gap-2 text-gray-700 font-medium">
