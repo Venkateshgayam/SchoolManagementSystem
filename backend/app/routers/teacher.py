@@ -110,7 +110,6 @@ async def create_teacher(
         employment_date=request.employment_date,
         status=request.status)
     db.add(teacher)
-    db.add(teacher)
     await db.commit()
 
     await write_audit_log(

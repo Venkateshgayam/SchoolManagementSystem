@@ -16,6 +16,13 @@ const PUBLIC_ROLES: Record<string, { role: string; title: string; subtitle: stri
   },
 };
 
+export function generateStaticParams() {
+  return [
+    { role: "student" },
+    { role: "teacher" },
+  ];
+}
+
 export default function RoleLoginPage({ params }: { params: { role: string } }) {
   const { role } = params;
 

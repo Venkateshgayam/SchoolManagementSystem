@@ -13,7 +13,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import toast from "react-hot-toast";
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Invalid email"),
+  email: z.string().min(1, "Email or username is required"),
   password: z.string().min(1, "Password is required"),
   rememberMe: z.boolean().optional(),
 });
