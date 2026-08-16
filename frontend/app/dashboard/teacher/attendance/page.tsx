@@ -1,9 +1,10 @@
 "use client";
 import { formatDate } from "@/lib/formatters";
 
-import { useState, useEffect } from "react";
-import { Calendar, Users, Save, ClipboardList } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Calendar, Users, Save, ClipboardList, History } from "lucide-react";
 import api from "@/lib/api";
+import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
 
 interface TeacherInfo {
   id: number;
@@ -48,6 +49,11 @@ export default function TeacherAttendancePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Month filter for review (YYYY-MM)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    return new Date().toLocaleDateString('en-CA').slice(0, 7);
+  });
+
   useEffect(() => {
     async function fetchAll() {
       try {
@@ -83,7 +89,27 @@ export default function TeacherAttendancePage() {
 
   const classAttendance = selectedClassId
     ? attendance.filter((a) => a.class_id === selectedClassId)
-    : [];
+    : attendance;
+
+  // Month-filtered class attendance records
+  const monthClassAttendance = useMemo(() => {
+    return selectedMonth === "all"
+      ? classAttendance
+      : classAttendance.filter((a) => a.date.startsWith(selectedMonth));
+  }, [classAttendance, selectedMonth]);
+
+  const { total: monthTotal, present: monthPresent, absent: monthAbsent, late: monthLate, rate: monthRate } = calculateAttendanceStats(monthClassAttendance);
+
+  const getMonthLabel = (monthStr: string) => {
+    if (monthStr === "all") return "All Time";
+    try {
+      const [y, m] = monthStr.split("-").map(Number);
+      const date = new Date(y, m - 1, 1);
+      return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    } catch {
+      return monthStr;
+    }
+  };
 
   const handleStatusChange = (studentId: number, value: string) => {
     setStatuses((prev) => ({ ...prev, [studentId]: value }));
@@ -159,10 +185,65 @@ export default function TeacherAttendancePage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Mark Attendance</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Mark & Review Attendance</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage class attendance and review historical records by month</p>
+        </div>
 
-      <div className="card mb-6">
+        {/* Month Selector Filter */}
+        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+          <Calendar className="h-4 w-4 text-gray-500 shrink-0 ml-1" />
+          <input
+            type="month"
+            value={selectedMonth === "all" ? "" : selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value || "all")}
+            className="text-sm border border-gray-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <button
+            type="button"
+            onClick={() => setSelectedMonth(selectedMonth === "all" ? new Date().toLocaleDateString('en-CA').slice(0, 7) : "all")}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+              selectedMonth === "all"
+                ? "bg-primary-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {selectedMonth === "all" ? "Current Month" : "All Months"}
+          </button>
+        </div>
+      </div>
+
+      {/* Monthly Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">{getMonthLabel(selectedMonth)} Rate</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{monthRate.toFixed(1)}%</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal} mark(s) recorded</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">Present</p>
+          <p className="mt-2 text-2xl font-bold text-green-600">{monthPresent}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthPresent / monthTotal) * 100)}%` : "0%"}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">Absent</p>
+          <p className="mt-2 text-2xl font-bold text-red-600">{monthAbsent}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthAbsent / monthTotal) * 100)}%` : "0%"}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">Late</p>
+          <p className="mt-2 text-2xl font-bold text-yellow-600">{monthLate}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthLate / monthTotal) * 100)}%` : "0%"}</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-primary-600" />
+          Mark Daily Attendance
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">Class</label>
@@ -207,7 +288,7 @@ export default function TeacherAttendancePage() {
 
       {message && (
         <div
-          className={`card mb-6 ${
+          className={`card ${
             message.includes("Failed") ? "border-danger-200 bg-danger-50" : "border-green-200 bg-green-50"
           }`}
         >
@@ -286,13 +367,23 @@ export default function TeacherAttendancePage() {
         </div>
       )}
 
-      <div className="card mt-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Records</h2>
-        {classAttendance.length === 0 ? (
-          <p className="text-gray-600">No attendance records for this class.</p>
+      {/* Historical Monthly Attendance Review for Teacher */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <History className="h-5 w-5 text-primary-600" />
+            Attendance Records ({getMonthLabel(selectedMonth)})
+          </h2>
+          <span className="text-xs text-gray-500 font-medium">
+            {monthClassAttendance.length} record(s)
+          </span>
+        </div>
+
+        {monthClassAttendance.length === 0 ? (
+          <p className="text-gray-600 text-sm py-4">No attendance records for {getMonthLabel(selectedMonth)}.</p>
         ) : (
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {classAttendance
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {monthClassAttendance
               .slice()
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((a) => (
@@ -301,9 +392,12 @@ export default function TeacherAttendancePage() {
                     <p className="font-medium text-gray-900">
                       {students.find(s => s.id === a.student_id)?.full_name || `Student #${a.student_id}`} — {formatDate(a.date)}
                     </p>
+                    <p className="text-xs text-gray-400">
+                      {classes.find(c => c.id === a.class_id)?.name || `Class #${a.class_id}`}
+                    </p>
                   </div>
                   <span
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${
                       a.status === "present"
                         ? "bg-green-100 text-green-800"
                         : a.status === "absent"

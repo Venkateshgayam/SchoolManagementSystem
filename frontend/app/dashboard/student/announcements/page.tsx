@@ -2,8 +2,9 @@
 import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
-import { Bell } from "lucide-react";
+import { Bell, EyeOff } from "lucide-react";
 import api from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface AnnouncementRecord {
   id: number;
@@ -20,6 +21,7 @@ export default function StudentAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dismissingId, setDismissingId] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchAnnouncements() {
@@ -35,6 +37,19 @@ export default function StudentAnnouncementsPage() {
 
     fetchAnnouncements();
   }, []);
+
+  const handleDismiss = async (id: number) => {
+    setDismissingId(id);
+    try {
+      await api.post(`/announcements/${id}/dismiss`);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Announcement dismissed");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to dismiss announcement");
+    } finally {
+      setDismissingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -70,7 +85,7 @@ export default function StudentAnnouncementsPage() {
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .map((announcement) => (
               <div key={announcement.id} className="card">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-gray-900">
                     {announcement.is_pinned && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 mr-2">
@@ -79,6 +94,15 @@ export default function StudentAnnouncementsPage() {
                     )}
                     {announcement.title}
                   </h3>
+                  <button
+                    onClick={() => handleDismiss(announcement.id)}
+                    disabled={dismissingId === announcement.id}
+                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors inline-flex items-center gap-1 text-xs shrink-0"
+                    title="Dismiss for me"
+                  >
+                    <EyeOff className="h-4 w-4" />
+                    <span>Dismiss</span>
+                  </button>
                 </div>
                 <p className="mt-2 text-sm text-gray-600">{announcement.content}</p>
                 <p className="mt-2 text-xs text-gray-400">

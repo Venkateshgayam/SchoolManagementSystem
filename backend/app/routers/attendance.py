@@ -24,28 +24,53 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
     return set(result.scalars().all())
 
 
+import calendar
+
 @router.get("/", response_model=List[AttendanceResponse])
 async def list_attendance(
+    month: Optional[str] = None,
+    date: Optional[str] = None,
+    class_id: Optional[int] = None,
+    student_id: Optional[int] = None,
     current_user: dict = Depends(require_role("admin", "teacher", "student")),
     db: AsyncSession = Depends(get_db)):
     role = current_user.get("role")
+    query = select(Attendance)
+
     if role == "student":
         student = await get_current_student(current_user=current_user, db=db)
-        result = await db.execute(select(Attendance).where(Attendance.student_id == student.id))
+        query = query.where(Attendance.student_id == student.id)
     elif role == "teacher":
         class_ids = await _teacher_class_ids(db, current_user)
         if not class_ids:
             return []
-        # Get student IDs in the teacher's classes
         student_ids_result = await db.execute(
             select(Student.id).where(Student.class_id.in_(class_ids))
         )
         student_ids = set(student_ids_result.scalars().all())
         if not student_ids:
             return []
-        result = await db.execute(select(Attendance).where(Attendance.student_id.in_(student_ids)))
-    else:
-        result = await db.execute(select(Attendance))
+        query = query.where(Attendance.student_id.in_(student_ids))
+
+    if class_id:
+        query = query.where(Attendance.class_id == class_id)
+    if student_id:
+        query = query.where(Attendance.student_id == student_id)
+    if date:
+        query = query.where(Attendance.date == date)
+    if month:
+        try:
+            parts = month.split("-")
+            year = int(parts[0])
+            m = int(parts[1])
+            _, last_day = calendar.monthrange(year, m)
+            start_date = f"{year:04d}-{m:02d}-01"
+            end_date = f"{year:04d}-{m:02d}-{last_day:02d}"
+            query = query.where(Attendance.date >= start_date, Attendance.date <= end_date)
+        except Exception:
+            pass
+
+    result = await db.execute(query)
     records = result.scalars().all()
     return records
 

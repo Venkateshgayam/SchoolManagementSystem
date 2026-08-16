@@ -18,7 +18,13 @@ import { calculateFeeSummary } from "@/lib/feeCalculations";
 
 interface FeeRecord { id: number; student_id: number; student_user_id: number | null; total_fee: number; amount_due: number; amount_paid: number; waiver_percentage: number; due_date: string | null; paid_date: string | null; status: string; academic_year: string | null; created_at: string; }
 
-const STATUSES = ["unpaid", "paid", "partial", "overdue"];
+const STATUSES = [
+  { value: "all", label: "All" },
+  { value: "unpaid", label: "Unpaid" },
+  { value: "paid", label: "Paid" },
+  { value: "partial", label: "Partial" },
+  { value: "overdue", label: "Overdue" },
+];
 
 export default function FeesManager() {
   const [fees, setFees] = useState<FeeRecord[]>([]);
@@ -159,7 +165,31 @@ export default function FeesManager() {
     }
   };
 
-  const filtered = statusFilter === "all" ? fees : fees.filter((f) => f.status === statusFilter);
+  const isOverdue = (f: FeeRecord) => {
+    if (!f.due_date) return false;
+    const isPaid = f.status === "PAID" || f.amount_due <= 0;
+    if (isPaid) return false;
+    const today = new Date().toISOString().split("T")[0];
+    return f.due_date < today;
+  };
+
+  const filtered = fees.filter((f) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "overdue") {
+      return f.status === "OVERDUE" || isOverdue(f);
+    }
+    if (statusFilter === "paid") {
+      return f.status === "PAID" || f.amount_due <= 0;
+    }
+    if (statusFilter === "partial") {
+      return (f.status === "PARTIAL" || (f.amount_paid > 0 && f.amount_due > 0)) && !isOverdue(f) && f.status !== "PAID";
+    }
+    if (statusFilter === "unpaid" || statusFilter === "pending") {
+      return (f.status === "PENDING" || f.amount_paid === 0) && f.status !== "PAID" && !isOverdue(f);
+    }
+    return f.status.toLowerCase() === statusFilter.toLowerCase();
+  });
+
   const {
     expectedRevenue,
     revenue: totalRevenue,
@@ -197,9 +227,12 @@ export default function FeesManager() {
       </div>
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-1">Filter by status</label>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input w-48">
-          <option value="all">All</option>
-          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input w-48 bg-white border border-gray-300 rounded-md px-3 py-2 text-sm capitalize">
+          {STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
         </select>
       </div>
       
@@ -240,7 +273,19 @@ export default function FeesManager() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{f.due_date ? formatDate(f.due_date) : "—"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={f.status === "PAID" ? "Fully Paid" : f.status === "PARTIAL" ? "Partially Paid" : "Unpaid"} /></td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <StatusBadge 
+                        status={
+                          f.status === "PAID" || f.amount_due <= 0 
+                            ? "Paid" 
+                            : (isOverdue(f) || f.status === "OVERDUE")
+                            ? "Overdue" 
+                            : (f.status === "PARTIAL" || f.amount_paid > 0)
+                            ? "Partial" 
+                            : "Unpaid"
+                        } 
+                      />
+                    </td>
                     {can("fee:update") && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         <div className="flex justify-end gap-3 items-center">

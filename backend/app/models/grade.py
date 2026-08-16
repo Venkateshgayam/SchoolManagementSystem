@@ -7,13 +7,14 @@ from app.database.database import Base
 class Grade(Base):
     __tablename__ = "grades"
     __table_args__ = (
-        UniqueConstraint('student_id', 'subject_id', 'exam_id', name='uq_student_subject_exam'),
+        UniqueConstraint('student_id', 'subject_id', 'exam_id', 'assignment_id', name='uq_student_subject_assessment'),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
     exam_id: Mapped[int | None] = mapped_column(ForeignKey("exams.id", ondelete="SET NULL"), nullable=True)
+    assignment_id: Mapped[int | None] = mapped_column(ForeignKey("assignments.id", ondelete="CASCADE"), nullable=True)
     marks_obtained: Mapped[float] = mapped_column(Float, nullable=False)
     total_marks: Mapped[float] = mapped_column(Float, nullable=False)
     percentage: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -24,6 +25,7 @@ class Grade(Base):
 
     student = relationship("Student", backref="grades")
     subject = relationship("Subject", backref="grades")
+    assignment = relationship("Assignment", back_populates="grades")
 
     def __repr__(self) -> str:
         return f"<Grade(id={self.id}, student_id={self.student_id}, subject_id={self.subject_id}, percentage={self.percentage})>"

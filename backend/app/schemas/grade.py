@@ -7,6 +7,7 @@ class GradeCreate(BaseModel):
     student_id: int
     subject_id: int
     exam_id: Optional[int] = None
+    assignment_id: Optional[int] = None
     marks_obtained: float = Field(..., ge=0)
     total_marks: float = Field(..., gt=0)
     created_by: Optional[int] = None
@@ -16,6 +17,7 @@ class GradeUpdate(BaseModel):
     marks_obtained: Optional[float] = Field(None, ge=0)
     total_marks: Optional[float] = Field(None, gt=0)
     exam_id: Optional[int] = None
+    assignment_id: Optional[int] = None
 
 
 class SubjectBase(BaseModel):
@@ -28,6 +30,7 @@ class GradeResponse(BaseModel):
     subject_id: int
     subject: Optional[SubjectBase] = None
     exam_id: Optional[int] = None
+    assignment_id: Optional[int] = None
     marks_obtained: float
     total_marks: float
     percentage: Optional[float] = None

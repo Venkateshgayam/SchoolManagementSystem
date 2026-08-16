@@ -88,3 +88,11 @@ async def startup():
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/server-time")
+async def server_time():
+    """Returns the current server UTC time. Used by clients to anchor time-gated checks
+    against a reliable clock source, preventing bypass via device clock manipulation."""
+    from datetime import datetime, timezone
+    return {"utc": datetime.now(timezone.utc).isoformat()}

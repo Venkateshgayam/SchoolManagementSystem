@@ -2,8 +2,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.database.database import get_db
 from app.models.schedule import Schedule
+from app.models.subject import Subject
 from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.class_model import Class
@@ -89,6 +91,15 @@ async def create_schedule(
     if "day_of_week" not in data or data["day_of_week"] is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date or day_of_week is required")
         
+    if "teacher_id" in data and data["teacher_id"] is not None:
+        subject = (
+            await db.execute(select(Subject).options(selectinload(Subject.teachers)).where(Subject.id == data["subject_id"]))
+        ).scalar_one_or_none()
+        if not subject:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+        if data["teacher_id"] not in subject.teacher_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Teacher is not assigned to this subject")
+            
     schedule = Schedule(**data)
     db.add(schedule)
     await db.commit()
@@ -124,6 +135,16 @@ async def update_schedule(
     if "academic_year" in update_data:
         update_data.pop("academic_year")
         
+    if "teacher_id" in update_data and update_data["teacher_id"] is not None:
+        target_subject_id = update_data.get("subject_id", schedule.subject_id)
+        subject = (
+            await db.execute(select(Subject).options(selectinload(Subject.teachers)).where(Subject.id == target_subject_id))
+        ).scalar_one_or_none()
+        if not subject:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+        if update_data["teacher_id"] not in subject.teacher_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Teacher is not assigned to this subject")
+            
     for key, value in update_data.items():
         setattr(schedule, key, value)
         

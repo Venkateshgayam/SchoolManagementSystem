@@ -19,7 +19,7 @@ class AssignmentSubmission(Base):
         UniqueConstraint("assignment_id", "student_id", name="uq_assignment_submission"),
     )
 
-    assignment = relationship("Assignment", backref="submissions")
+    assignment = relationship("Assignment", back_populates="submissions")
     student = relationship("Student", backref="assignment_submissions")
 
     def __repr__(self) -> str:

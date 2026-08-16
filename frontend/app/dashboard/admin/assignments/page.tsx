@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { FileText, Plus, Save, BookOpen, Calendar, UserCheck, Pencil, Trash2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { FileText, Plus, Save, BookOpen, Calendar, UserCheck, Pencil, Trash2, ChevronDown, ChevronUp, Paperclip } from "lucide-react";
 import {   formatTeacherNameId , formatDate } from "@/lib/formatters";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
@@ -9,6 +9,7 @@ import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import toast from "react-hot-toast";
 import { useSettings } from "@/hooks/useSettings";
+import { calculateLiveGrade } from "@/lib/gradeUtils";
 
 interface AssignmentRecord {
   id: number;
@@ -43,11 +44,19 @@ export default function AdminAssignmentsPage() {
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [subjects, setSubjects] = useState<SubjectRecord[]>([]);
   const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [grades, setGrades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const { settings } = useSettings();
   const isPast = (dateStr: string | null) => dateStr ? new Date(dateStr) < new Date() : false;
+
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [gradeInputs, setGradeInputs] = useState<Record<number, string>>({});
+  const [gradingId, setGradingId] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AssignmentRecord | null>(null);
@@ -72,16 +81,22 @@ export default function AdminAssignmentsPage() {
   useEffect(() => {
     async function fetchAll() {
       try {
-        const [a, c, s, t] = await Promise.all([
+        const [a, c, s, t, st, sub, gr] = await Promise.all([
           api.get("/assignments/").catch(() => ({ data: [] })),
           api.get("/classes/").catch(() => ({ data: [] })),
           api.get("/subjects/").catch(() => ({ data: [] })),
           api.get("/teachers/").catch(() => ({ data: [] })),
+          api.get("/students/").catch(() => ({ data: [] })),
+          api.get("/assignment-submissions/").catch(() => ({ data: [] })),
+          api.get("/grades/").catch(() => ({ data: [] })),
         ]);
         setAssignments(a.data);
         setClasses(c.data);
         setSubjects(s.data);
         setTeachers(t.data);
+        setStudents(st.data);
+        setSubmissions(sub.data);
+        setGrades(gr.data);
       } catch (err: any) {
         setError(err?.message || "Failed to load assignments");
       } finally {
@@ -90,6 +105,27 @@ export default function AdminAssignmentsPage() {
     }
     fetchAll();
   }, []);
+
+  const toggleExpand = (id: number) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleGrade = async (submissionId: number) => {
+    const val = gradeInputs[submissionId];
+    if (!val || isNaN(Number(val))) return;
+    setGradingId(submissionId);
+    try {
+      const res = await api.put(`/assignment-submissions/${submissionId}/grade`, { grade: Number(val) });
+      setSubmissions((prev) => prev.map((s) => (s.id === submissionId ? res.data : s)));
+      const gradesRes = await api.get("/grades/");
+      setGrades(gradesRes.data);
+      toast.success("Marks saved");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to save marks");
+    } finally {
+      setGradingId(null);
+    }
+  };
 
   const resetForm = () => {
     setFormTitle("");
@@ -159,8 +195,15 @@ export default function AdminAssignmentsPage() {
     setDeleting(true);
     try {
       await api.delete(`/assignments/${deleteTarget.id}`);
+      toast.success("Assignment deleted successfully");
       setDeleteTarget(null);
       await fetchAssignments();
+      const [subRes, grRes] = await Promise.all([
+        api.get("/assignment-submissions/").catch(() => ({ data: [] })),
+        api.get("/grades/").catch(() => ({ data: [] })),
+      ]);
+      setSubmissions(subRes.data);
+      setGrades(grRes.data);
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || "Failed to delete assignment");
     } finally {
@@ -223,26 +266,147 @@ export default function AdminAssignmentsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {assignments.slice().sort((a, b) => (b.due_date || "").localeCompare(a.due_date || "")).map((a) => (
-                  <tr key={a.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{a.title}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><BookOpen className="h-4 w-4 inline mr-1 text-gray-400" />{subjectName(a.subject_id)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{className(a.class_id)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{a.due_date ? formatDate(a.due_date) : "—"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><UserCheck className="h-4 w-4 inline mr-1 text-gray-400" />{a.teacher_id ? formatTeacherNameId(teachers.find(t => t.id === a.teacher_id)?.full_name, a.teacher_id) : "—"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <button
-                        onClick={() => !isPast(a.due_date) && openEdit(a)}
-                        className={`text-gray-500 hover:text-primary-600 mr-3 ${isPast(a.due_date) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={isPast(a.due_date) ? "Cannot edit — due date has passed" : "Edit"}
-                        disabled={isPast(a.due_date)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => setDeleteTarget(a)} className="text-gray-500 hover:text-red-600" title="Delete">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
+                    <React.Fragment key={a.id}>
+                      <tr>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{a.title}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><BookOpen className="h-4 w-4 inline mr-1 text-gray-400" />{subjectName(a.subject_id)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{className(a.class_id)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Calendar className="h-4 w-4 inline mr-1 text-gray-400" />{a.due_date ? formatDate(a.due_date) : "—"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><UserCheck className="h-4 w-4 inline mr-1 text-gray-400" />{a.teacher_id ? formatTeacherNameId(teachers.find(t => t.id === a.teacher_id)?.full_name, a.teacher_id) : "—"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm flex justify-end items-center gap-3">
+                          <button
+                            onClick={() => !isPast(a.due_date) && openEdit(a)}
+                            className={`text-gray-500 hover:text-primary-600 ${isPast(a.due_date) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={isPast(a.due_date) ? "Cannot edit — due date has passed" : "Edit"}
+                            disabled={isPast(a.due_date)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => setDeleteTarget(a)} className="text-gray-500 hover:text-red-600" title="Delete">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => toggleExpand(a.id)}
+                            className="text-primary-600 hover:text-primary-900 flex items-center justify-end w-28 ml-2"
+                          >
+                            {expandedId === a.id ? (
+                              <><ChevronUp className="h-4 w-4 mr-1" /> Hide Subs</>
+                            ) : (
+                              <><ChevronDown className="h-4 w-4 mr-1" /> View Subs</>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedId === a.id && (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                              <div className="px-4 py-3 bg-gray-100 border-b border-gray-200">
+                                <h4 className="text-sm font-semibold text-gray-800">Student Submissions</h4>
+                              </div>
+                              <ul className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                                {students
+                                  .filter((s) => s.class_id === a.class_id)
+                                  .map((student) => {
+                                    const submission = submissions.find(
+                                      (sub) => sub.assignment_id === a.id && sub.student_id === student.id
+                                    );
+                                    const gradeRecord = grades.find(
+                                      (g) => g.assignment_id === a.id && g.student_id === student.id
+                                    );
+                                    return (
+                                      <li key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                          <p className="text-sm font-medium text-gray-900 mb-1">
+                                            {student.full_name || `Student #${student.id}`} {student.roll_number ? `(${student.roll_number})` : ""}
+                                          </p>
+                                          {submission ? (
+                                            <div className="mt-2 text-sm text-gray-600 bg-gray-50 rounded p-3 border border-gray-100">
+                                              {submission.submission_text ? (
+                                                <p className="whitespace-pre-wrap">{submission.submission_text}</p>
+                                              ) : (
+                                                <p className="italic text-gray-400">No text provided.</p>
+                                              )}
+                                              {submission.attachment_url && (
+                                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                                  {submission.attachment_url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                                                    <div className="mt-2">
+                                                      <img 
+                                                        src={`${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:8000"}${submission.attachment_url}`} 
+                                                        alt="Attachment Preview" 
+                                                        className="max-w-sm max-h-64 object-contain rounded-md border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                                                        onClick={() => setPreviewUrl(`${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:8000"}${submission.attachment_url}`)}
+                                                        title="Click to enlarge"
+                                                      />
+                                                    </div>
+                                                  ) : (
+                                                    <button
+                                                      onClick={() => setPreviewUrl(`${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:8000"}${submission.attachment_url}`)}
+                                                      className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-800 font-medium bg-primary-50 px-3 py-1.5 rounded-md hover:bg-primary-100 transition-colors"
+                                                    >
+                                                      <Paperclip className="h-4 w-4" /> View Attachment
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                              Not submitted
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-right flex flex-col items-end">
+                                          {submission && (
+                                            <>
+                                              <span className="text-xs text-gray-500 block mb-2">
+                                                {new Date(submission.submitted_at).toLocaleString()}
+                                              </span>
+                                              <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-md border border-gray-200">
+                                                <span className="text-sm font-medium text-gray-700 ml-1">Marks:</span>
+                                                <input
+                                                  type="number"
+                                                  step="1"
+                                                  min="0"
+                                                  max={a.total_marks || 30}
+                                                  value={gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "")}
+                                                  onChange={(e) => setGradeInputs({ ...gradeInputs, [submission.id]: e.target.value })}
+                                                  placeholder={`/ ${a.total_marks || 30}`}
+                                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                                />
+                                                <button
+                                                  onClick={() => handleGrade(submission.id)}
+                                                  disabled={gradingId === submission.id || !gradeInputs[submission.id]}
+                                                  className="px-3 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                                                >
+                                                  {gradingId === submission.id ? "..." : "Save"}
+                                                </button>
+                                                {(() => {
+                                                  const inputVal = gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "");
+                                                  const maxMarks = a.total_marks || settings.default_assignment_marks_scale || 30;
+                                                  const liveGrade = calculateLiveGrade(inputVal, maxMarks, settings.grading_scale) || gradeRecord?.letter_grade;
+                                                  return liveGrade ? (
+                                                    <span className="ml-2 font-bold text-lg text-primary-700">
+                                                      Grade: {liveGrade}
+                                                    </span>
+                                                  ) : null;
+                                                })()}
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                      </li>
+                                    );
+                                  })}
+                                {students.filter((s) => s.class_id === a.class_id).length === 0 && (
+                                  <li className="p-4 text-sm text-gray-500 text-center">No students in this class.</li>
+                                )}
+                              </ul>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -360,7 +524,7 @@ export default function AdminAssignmentsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete Assignment"
-        message={`Are you sure you want to delete ${deleteTarget?.title}? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? This will permanently delete the assignment along with all student submissions, attachments, and associated grades. This action cannot be undone.`}
         loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}

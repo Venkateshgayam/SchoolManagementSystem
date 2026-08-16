@@ -39,6 +39,30 @@ export function getLetterGrade(
 }
 
 /**
+ * Calculate live letter grade from marks obtained and total max marks using the configured grading scale.
+ * @param marksObtained  Current marks (string or number)
+ * @param totalMarks     Total marks scale (e.g. 100, 50, 30)
+ * @param scale          Configured grading scale entries
+ * @returns              Letter grade string (e.g. "A", "B") or null if marksObtained is empty/invalid
+ */
+export function calculateLiveGrade(
+  marksObtained: string | number | null | undefined,
+  totalMarks: number | null | undefined,
+  scale?: GradeScaleEntry[] | null
+): string | null {
+  if (marksObtained === null || marksObtained === undefined || marksObtained === "") {
+    return null;
+  }
+  const marks = Number(marksObtained);
+  if (isNaN(marks) || marks < 0) {
+    return null;
+  }
+  const max = totalMarks && totalMarks > 0 ? totalMarks : 100;
+  const pct = (marks / max) * 100;
+  return getLetterGrade(pct, scale);
+}
+
+/**
  * Return a Tailwind colour-class pair for a letter grade badge.
  * Handles any letter; unknown grades get a neutral style.
  */

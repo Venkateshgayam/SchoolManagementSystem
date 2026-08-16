@@ -74,18 +74,19 @@ export default function AdminDashboard() {
     fetchAll();
   }, []);
 
-  const { rate: attendanceRate, present, late, absent } = calculateAttendanceStats(attendance);
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const todayAttendance = attendance.filter((a) => a.date === todayStr || a.date?.startsWith(todayStr));
+  const { rate: todayAttendanceRate, total: todayTotalMarked } = calculateAttendanceStats(todayAttendance);
   const attendanceThreshold: number = settings.attendance_at_risk_threshold ?? 75;
-  const attendanceTrend = (
+  const attendanceTrend = todayTotalMarked > 0 ? (
     <div className="flex flex-col text-xs mt-1">
-      <span className="text-gray-500">P: {present} | L: {late} | A: {absent}</span>
-      {attendanceRate > 0 && attendanceRate < attendanceThreshold ? (
+      {todayAttendanceRate < attendanceThreshold ? (
         <span className="text-red-600 font-medium mt-1">⚠ Below {attendanceThreshold}%</span>
-      ) : attendanceRate >= attendanceThreshold ? (
+      ) : (
         <span className="text-green-600 font-medium mt-1">✓ Above {attendanceThreshold}%</span>
-      ) : null}
+      )}
     </div>
-  );
+  ) : null;
   const {
     expectedRevenue,
     revenue,
@@ -141,7 +142,7 @@ export default function AdminDashboard() {
         <StatCard title="Total Teachers" value={teachers.length} icon={UserCheck} />
         <StatCard title="Total Classes" value={classes.length} icon={BookOpen} />
         <StatCard title="Total Subjects" value={subjects.length} icon={BookOpen} />
-        <StatCard title="Total School Attendance" value={`${attendanceRate.toFixed(1)}%`} icon={ClipboardList} trend={attendanceTrend} />
+        <StatCard title="Today's School Attendance" value={`${todayAttendanceRate.toFixed(1)}%`} icon={ClipboardList} trend={attendanceTrend} />
         <StatCard title="Upcoming Exams" value={upcomingExams.length} icon={Calendar} />
       </div>
 

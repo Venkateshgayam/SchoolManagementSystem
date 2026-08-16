@@ -123,8 +123,12 @@ export default function ClassDetail({ classId }: { classId: number }) {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                        <Link href={`/dashboard/${role}/students/${s.id}`} className="text-gray-500 hover:text-blue-600 inline-block" title="Click here for student profile">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/dashboard/${role}/students/${s.id}`}
+                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 rounded-md transition-colors border border-blue-200 inline-flex items-center justify-center"
+                          title="Click here for student profile"
+                        >
                           <Eye className="h-4 w-4" />
                         </Link>
                       </div>

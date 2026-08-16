@@ -49,16 +49,38 @@ async def list_grades(
         student = await get_current_student(current_user=current_user, db=db)
         result = await db.execute(select(Grade).options(selectinload(Grade.subject)).where(Grade.student_id == student.id))
     elif role == "teacher":
+        teacher = (
+            await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
+        ).scalar_one_or_none()
+        if not teacher:
+            return []
+        
         class_ids = await _teacher_class_ids(db, current_user)
-        if not class_ids:
-            return []
-        student_ids_result = await db.execute(
-            select(Student.id).where(Student.class_id.in_(class_ids))
+        from app.models.subject import teacher_subjects
+        from sqlalchemy import or_
+        
+        subject_ids_result = await db.execute(
+            select(teacher_subjects.c.subject_id).where(teacher_subjects.c.teacher_id == teacher.id)
         )
-        student_ids = set(student_ids_result.scalars().all())
-        if not student_ids:
+        subject_ids = set(subject_ids_result.scalars().all())
+        
+        conditions = []
+        if class_ids:
+            student_ids_result = await db.execute(
+                select(Student.id).where(Student.class_id.in_(class_ids))
+            )
+            student_ids = set(student_ids_result.scalars().all())
+            if student_ids:
+                conditions.append(Grade.student_id.in_(student_ids))
+        if subject_ids:
+            conditions.append(Grade.subject_id.in_(subject_ids))
+            
+        if not conditions:
             return []
-        result = await db.execute(select(Grade).options(selectinload(Grade.subject)).where(Grade.student_id.in_(student_ids)))
+            
+        result = await db.execute(
+            select(Grade).options(selectinload(Grade.subject)).where(or_(*conditions))
+        )
     else:
         result = await db.execute(select(Grade).options(selectinload(Grade.subject)))
     grades = result.scalars().all()
@@ -92,8 +114,8 @@ async def create_grade(
     request: GradeCreate,
     current_user: dict = Depends(require_role("admin", "teacher")),
     db: AsyncSession = Depends(get_db)):
-    if not request.exam_id:
-        raise HTTPException(status_code=400, detail="exam_id is required")
+    if not request.exam_id and not request.assignment_id:
+        raise HTTPException(status_code=400, detail="Either exam_id or assignment_id is required")
         
     if request.marks_obtained > request.total_marks:
         raise HTTPException(status_code=400, detail="Marks obtained cannot be greater than total marks")
@@ -107,13 +129,16 @@ async def create_grade(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot grade student not in your assigned classes")
             
     # Check if a grade already exists for this combination
-    existing_result = await db.execute(
-        select(Grade).options(selectinload(Grade.subject)).where(
-            Grade.student_id == request.student_id,
-            Grade.subject_id == request.subject_id,
-            Grade.exam_id == request.exam_id
-        )
+    query = select(Grade).options(selectinload(Grade.subject)).where(
+        Grade.student_id == request.student_id,
+        Grade.subject_id == request.subject_id
     )
+    if request.exam_id:
+        query = query.where(Grade.exam_id == request.exam_id)
+    elif request.assignment_id:
+        query = query.where(Grade.assignment_id == request.assignment_id)
+        
+    existing_result = await db.execute(query)
     existing_grade = existing_result.scalar_one_or_none()
     
     # Calculate percentage and letter grade

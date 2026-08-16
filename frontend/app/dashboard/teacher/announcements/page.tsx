@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Megaphone, Save, PlusCircle, Users } from "lucide-react";
+import { Megaphone, Save, PlusCircle, Users, Trash2, EyeOff } from "lucide-react";
 import api from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface TeacherInfo {
   id: number;
@@ -23,6 +24,7 @@ export default function TeacherAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<AnnouncementInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   const [formTitle, setFormTitle] = useState("");
   const [formContent, setFormContent] = useState("");
@@ -84,6 +86,33 @@ export default function TeacherAnnouncementsPage() {
       setMessage(err?.response?.data?.detail || "Failed to create announcement");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDismiss = async (id: number) => {
+    setActionLoadingId(id);
+    try {
+      await api.post(`/announcements/${id}/dismiss`);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Announcement dismissed");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to dismiss announcement");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this announcement for everyone?")) return;
+    setActionLoadingId(id);
+    try {
+      await api.delete(`/announcements/${id}`);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Announcement deleted");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to delete announcement");
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -205,17 +234,41 @@ export default function TeacherAnnouncementsPage() {
               .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
               .map((a) => (
                 <div key={a.id} className="border border-gray-200 rounded-md p-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">{a.title}</h3>
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        a.target_role === "all"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {a.target_role}
-                    </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{a.title}</h3>
+                      <span
+                        className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full mt-1 ${
+                          a.target_role === "all"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {a.target_role}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleDismiss(a.id)}
+                        disabled={actionLoadingId === a.id}
+                        className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors inline-flex items-center gap-1 text-xs"
+                        title="Dismiss for me"
+                      >
+                        <EyeOff className="h-4 w-4" />
+                        <span>Dismiss</span>
+                      </button>
+                      {teacher && a.created_by === teacher.user_id && (
+                        <button
+                          onClick={() => handleDelete(a.id)}
+                          disabled={actionLoadingId === a.id}
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors inline-flex items-center gap-1 text-xs"
+                          title="Delete announcement for everyone"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {a.content && <p className="text-gray-600 mt-2 text-sm">{a.content}</p>}
                   <p className="text-xs text-gray-400 mt-2">

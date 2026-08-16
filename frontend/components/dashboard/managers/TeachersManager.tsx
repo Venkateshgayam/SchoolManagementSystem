@@ -49,6 +49,7 @@ export default function TeachersManager() {
   const [perm, setPerm] = useState({ create: false, update: false, del: false });
   const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
   const [subjects, setSubjects] = useState<{ id: number; name: string; teacher_ids: number[] }[]>([]);
+  const [classes, setClasses] = useState<{ id: number; name: string; section: string; teacher_id: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -66,12 +67,14 @@ export default function TeachersManager() {
   }, []);
 
   const fetchData = async () => {
-    const [resTeachers, resSubjects] = await Promise.all([
+    const [resTeachers, resSubjects, resClasses] = await Promise.all([
       api.get("/teachers/"),
-      api.get("/subjects/")
+      api.get("/subjects/"),
+      api.get("/classes/")
     ]);
     setTeachers(resTeachers.data);
     setSubjects(resSubjects.data);
+    setClasses(resClasses.data);
   };
 
   useEffect(() => {
@@ -228,35 +231,68 @@ export default function TeachersManager() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qualification</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Experience</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Teacher</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filtered.map((t) => (
                   <tr key={t.id} className="group hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{formatTeacherNameId(t.full_name, t.id)}</div>
-                      <div className="text-xs text-gray-500">{t.email || `user#${t.user_id}`}</div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      TCH-{String(t.id).padStart(3, "0")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Award className="h-4 w-4 inline mr-1 text-gray-400" />{t.qualification || "N/A"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{t.experience_years ?? "—"} yr(s)</td>
-                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={t.status} /></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {t.full_name || "N/A"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {(() => {
+                        const teacherSubjects = subjects.filter(s => s.teacher_ids && s.teacher_ids.includes(t.id));
+                        if (teacherSubjects.length === 0) return "—";
+                        return (
+                          <div className="flex flex-col gap-1">
+                            {teacherSubjects.map(s => <span key={s.id}>{s.name}</span>)}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {(() => {
+                        const teacherClasses = classes.filter(c => c.teacher_id === t.id);
+                        if (teacherClasses.length === 0) return "—";
+                        return (
+                          <div className="flex flex-col gap-1">
+                            {teacherClasses.map(c => <span key={c.id}>{c.name} {c.section || ""}</span>)}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                        <button onClick={() => setViewDetailsTarget(t)} className="text-gray-500 hover:text-blue-600 mr-3 inline-block" title="View teacher profile">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => setViewDetailsTarget(t)}
+                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 rounded-md transition-colors border border-blue-200 inline-flex items-center justify-center"
+                          title="View teacher profile"
+                        >
                           <Eye className="h-4 w-4" />
                         </button>
                         {perm.update && (
-                          <button onClick={() => openEdit(t)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
+                          <button
+                            onClick={() => openEdit(t)}
+                            className="p-1.5 text-amber-600 bg-amber-50 hover:bg-amber-100 hover:text-amber-700 rounded-md transition-colors border border-amber-200 inline-flex items-center justify-center"
+                            title="Edit Teacher"
+                          >
                             <Pencil className="h-4 w-4" />
                           </button>
                         )}
                         {perm.del && (
-                          <button onClick={() => setDeleteTarget(t)} className="text-gray-500 hover:text-red-600" title="Delete">
+                          <button
+                            onClick={() => setDeleteTarget(t)}
+                            className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 rounded-md transition-colors border border-red-200 inline-flex items-center justify-center"
+                            title="Delete Teacher"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -321,8 +357,12 @@ export default function TeachersManager() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <p className="text-sm text-gray-500">Teacher ID</p>
+                <p className="font-medium">TCH-{String(viewDetailsTarget.id).padStart(3, "0")}</p>
+              </div>
+              <div>
                 <p className="text-sm text-gray-500">Name</p>
-                <p className="font-medium">{viewDetailsTarget.full_name || `Teacher #${viewDetailsTarget.id}`}</p>
+                <p className="font-medium">{viewDetailsTarget.full_name || "N/A"}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Email</p>
@@ -362,6 +402,23 @@ export default function TeachersManager() {
                     </div>
                   ) : (
                     <p className="text-sm italic text-gray-400">No subjects assigned</p>
+                  );
+                })()}
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-gray-500 mb-1">Class Teacher</p>
+                {(() => {
+                  const teacherClasses = classes.filter(c => c.teacher_id === viewDetailsTarget.id);
+                  return teacherClasses.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {teacherClasses.map(c => (
+                        <span key={c.id} className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded-md border border-green-100">
+                          {c.name} {c.section || ""}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm italic text-gray-400">—</p>
                   );
                 })()}
               </div>

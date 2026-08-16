@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ClipboardList, Calendar, Save } from "lucide-react";
-import { formatStudentNameId } from "@/lib/formatters";
+import { ClipboardList, Calendar, Save, History, Users, Filter, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { formatStudentNameId, formatDate } from "@/lib/formatters";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import { can } from "@/lib/permissions";
@@ -43,6 +43,13 @@ export default function AdminAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Month filter for review (YYYY-MM)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    return new Date().toLocaleDateString('en-CA').slice(0, 7);
+  });
+  const [historyClassFilter, setHistoryClassFilter] = useState<string>("all");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>("all");
 
   useEffect(() => {
     const today = new Date().toLocaleDateString('en-CA');
@@ -99,7 +106,34 @@ export default function AdminAttendancePage() {
     return cls ? `${cls.name} ${cls.section || ""}`.trim() : `Class #${classId}`;
   };
 
-  const { rate: attendanceRate } = calculateAttendanceStats(attendance);
+  const getMonthLabel = (monthStr: string) => {
+    if (monthStr === "all") return "All Time";
+    try {
+      const [y, m] = monthStr.split("-").map(Number);
+      const date = new Date(y, m - 1, 1);
+      return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    } catch {
+      return monthStr;
+    }
+  };
+
+  // Month-filtered attendance records
+  const monthAttendance = useMemo(() => {
+    return selectedMonth === "all"
+      ? attendance
+      : attendance.filter((a) => a.date.startsWith(selectedMonth));
+  }, [attendance, selectedMonth]);
+
+  const { total: monthTotal, present: monthPresent, absent: monthAbsent, late: monthLate, rate: monthRate } = calculateAttendanceStats(monthAttendance);
+
+  // History table filtered records
+  const historyFilteredRecords = useMemo(() => {
+    return monthAttendance.filter((a) => {
+      if (historyClassFilter !== "all" && a.class_id !== Number(historyClassFilter)) return false;
+      if (historyStatusFilter !== "all" && a.status.toLowerCase() !== historyStatusFilter.toLowerCase()) return false;
+      return true;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [monthAttendance, historyClassFilter, historyStatusFilter]);
 
   const handleSave = async () => {
     if (!selectedClassId) {
@@ -160,16 +194,67 @@ export default function AdminAttendancePage() {
   if (error) return (<div className="card max-w-lg mx-auto text-center py-8"><p className="text-gray-600 mb-4">{error}</p><button onClick={() => window.location.reload()} className="btn-primary">Retry</button></div>);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Attendance</h1>
-      <div className="card mb-6">
-        <p className="text-sm text-gray-600">
-          School-wide attendance rate: <span className="font-bold text-gray-900">{attendanceRate.toFixed(1)}%</span>
-        </p>
+    <div className="space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
+          <p className="text-sm text-gray-500 mt-1">Mark daily attendance and review historical monthly records</p>
+        </div>
+
+        {/* Month Selector Filter */}
+        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+          <Calendar className="h-4 w-4 text-gray-500 shrink-0 ml-1" />
+          <input
+            type="month"
+            value={selectedMonth === "all" ? "" : selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value || "all")}
+            className="text-sm border border-gray-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <button
+            type="button"
+            onClick={() => setSelectedMonth(selectedMonth === "all" ? new Date().toLocaleDateString('en-CA').slice(0, 7) : "all")}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+              selectedMonth === "all"
+                ? "bg-primary-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {selectedMonth === "all" ? "Current Month" : "All Months"}
+          </button>
+        </div>
       </div>
 
-      <div className="card mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Monthly Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">{getMonthLabel(selectedMonth)} Rate</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{monthRate.toFixed(1)}%</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal} total mark(s)</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">Present</p>
+          <p className="mt-2 text-2xl font-bold text-green-600">{monthPresent}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthPresent / monthTotal) * 100)}%` : "0%"}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">Absent</p>
+          <p className="mt-2 text-2xl font-bold text-red-600">{monthAbsent}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthAbsent / monthTotal) * 100)}%` : "0%"}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-gray-500 uppercase">Late</p>
+          <p className="mt-2 text-2xl font-bold text-yellow-600">{monthLate}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthLate / monthTotal) * 100)}%` : "0%"}</p>
+        </div>
+      </div>
+
+      {/* Mark / Edit Attendance Section */}
+      <div className="card">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-primary-600" />
+          Mark / Update Daily Attendance
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div>
             <label className="label">Class</label>
             <select
@@ -207,57 +292,151 @@ export default function AdminAttendancePage() {
             </button>
           </div>
         </div>
+
+        {selectedClassId === null ? (
+          <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
+            <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">Select a class above to mark or modify attendance.</p>
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
+            <p className="text-gray-500 text-sm">No students assigned to this class.</p>
+          </div>
+        ) : (
+          <div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status ({selectedDate})</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredStudents.map((student) => {
+                    const currentStatus = statusMap[student.id] ?? existingRecords.find((record) => record.student_id === student.id)?.status ?? "";
+                    return (
+                      <tr key={student.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatStudentNameId(student.full_name, student.id, student.roll_number)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.roll_number || "—"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <select
+                            className="input w-40"
+                            value={currentStatus}
+                            onChange={(e) => handleStatusChange(student.id, e.target.value)}
+                          >
+                            <option value="">Select status</option>
+                            {STATUS_OPTIONS.map((status) => (
+                              <option key={status} value={status}>{status}</option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-4 text-xs text-gray-500">Updating attendance for <span className="font-semibold">{filteredStudents.length}</span> student(s) on <span className="font-semibold">{selectedDate}</span>.</p>
+          </div>
+        )}
       </div>
 
-      {selectedClassId === null ? (
-        <div className="card text-center py-12">
-          <ClipboardList className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600">Select a class to add or correct attendance records.</p>
+      {/* Historical Monthly Attendance Review Section */}
+      <div className="card">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <History className="h-5 w-5 text-primary-600" />
+              Attendance Records Review ({getMonthLabel(selectedMonth)})
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">Filter past records by class and status for the selected month</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={historyClassFilter}
+              onChange={(e) => setHistoryClassFilter(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-2.5 py-1.5 bg-white"
+            >
+              <option value="all">All Classes</option>
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name} {cls.section || ""}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={historyStatusFilter}
+              onChange={(e) => setHistoryStatusFilter(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-2.5 py-1.5 bg-white capitalize"
+            >
+              <option value="all">All Statuses</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="late">Late</option>
+            </select>
+          </div>
         </div>
-      ) : filteredStudents.length === 0 ? (
-        <div className="card text-center py-12">
-          <ClipboardList className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600">No students assigned to this class.</p>
-        </div>
-      ) : (
-        <div className="card">
+
+        {historyFilteredRecords.length === 0 ? (
+          <div className="text-center py-8">
+            <ClipboardList className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">No attendance records found for {getMonthLabel(selectedMonth)} with selected filters.</p>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredStudents.map((student) => {
-                  const currentStatus = statusMap[student.id] ?? existingRecords.find((record) => record.student_id === student.id)?.status ?? "";
+                {historyFilteredRecords.slice(0, 100).map((record) => {
+                  const s = students.find((st) => st.id === record.student_id);
                   return (
-                    <tr key={student.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatStudentNameId(student.full_name, student.id, student.roll_number)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.roll_number || "—"}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          className="input w-40"
-                          value={currentStatus}
-                          onChange={(e) => handleStatusChange(student.id, e.target.value)}
+                    <tr key={record.id}>
+                      <td className="px-6 py-3.5 whitespace-nowrap text-sm text-gray-900">{formatDate(record.date)}</td>
+                      <td className="px-6 py-3.5 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {formatStudentNameId(s?.full_name, record.student_id, s?.roll_number)}
+                      </td>
+                      <td className="px-6 py-3.5 whitespace-nowrap text-sm text-gray-600">
+                        {getClassName(record.class_id)}
+                      </td>
+                      <td className="px-6 py-3.5 whitespace-nowrap text-sm">
+                        <span
+                          className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${
+                            record.status === "present"
+                              ? "bg-green-100 text-green-800"
+                              : record.status === "absent"
+                              ? "bg-red-100 text-red-800"
+                              : record.status === "late"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
                         >
-                          <option value="">Select status</option>
-                          {STATUS_OPTIONS.map((status) => (
-                            <option key={status} value={status}>{status}</option>
-                          ))}
-                        </select>
+                          {record.status}
+                        </span>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            {historyFilteredRecords.length > 100 && (
+              <p className="text-xs text-gray-400 text-center py-2">
+                Showing first 100 of {historyFilteredRecords.length} records.
+              </p>
+            )}
           </div>
-          <p className="mt-4 text-sm text-gray-600">Updating attendance for <span className="font-semibold">{filteredStudents.length}</span> student(s) on <span className="font-semibold">{selectedDate}</span>.</p>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

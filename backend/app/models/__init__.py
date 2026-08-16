@@ -11,7 +11,7 @@ from app.models.grade import Grade
 from app.models.exam import Exam, ExamSubjectSlot
 from app.models.assignment import Assignment
 from app.models.assignment_submission import AssignmentSubmission
-from app.models.announcement import Announcement
+from app.models.announcement import Announcement, AnnouncementDismissal
 from app.models.notification import Notification
 from app.models.fee import Fee
 from app.models.leave_request import LeaveRequest
@@ -38,6 +38,7 @@ __all__ = [
     "Assignment",
     "AssignmentSubmission",
     "Announcement",
+    "AnnouncementDismissal",
     "Notification",
     "Fee",
     "LeaveRequest",

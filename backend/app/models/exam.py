@@ -22,8 +22,10 @@ class Exam(Base):
     status: Mapped[ExamStatus] = mapped_column(SQLEnum(ExamStatus), default=ExamStatus.DRAFT)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     total_marks: Mapped[float | None] = mapped_column(Float, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(ForeignKey("classes.id", ondelete="CASCADE"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    class_ = relationship("Class")
     slots = relationship("ExamSubjectSlot", back_populates="exam", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
@@ -35,6 +37,7 @@ class ExamSubjectSlot(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     exam_id: Mapped[int] = mapped_column(ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    teacher_id: Mapped[int | None] = mapped_column(ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -42,6 +45,7 @@ class ExamSubjectSlot(Base):
 
     exam = relationship("Exam", back_populates="slots")
     subject = relationship("Subject")
+    teacher = relationship("Teacher")
     submissions = relationship("ExamSubmission", back_populates="slot", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:

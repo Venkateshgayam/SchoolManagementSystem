@@ -110,11 +110,15 @@ async def update_notification(
 @router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_notification(
     notification_id: int,
-    current_user: dict = Depends(require_role("admin")),
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
     db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Notification).where(Notification.id == notification_id))
     notification = result.scalar_one_or_none()
     if not notification:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    user_id = int(current_user["sub"])
+    user_role = current_user.get("role")
+    if user_role != "admin" and notification.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     await db.delete(notification)
     await db.commit()

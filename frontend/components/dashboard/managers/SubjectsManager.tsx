@@ -219,21 +219,35 @@ export default function SubjectsManager() {
                     </td>
                     {(perm.update || perm.del) && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        {perm.update && (
-                          <button onClick={() => openEdit(s)} className="text-gray-500 hover:text-primary-600 mr-3" title="Edit">
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        )}
-                        {perm.update && (
-                          <button onClick={() => { setAssignTarget(s); setSelectedTeachers(s.teacher_ids || []); setAssignOpen(true); }} className="text-gray-500 hover:text-teal-600 mr-3" title="Manage Teachers">
-                            <Tag className="h-4 w-4" />
-                          </button>
-                        )}
-                        {perm.del && (
-                          <button onClick={() => setDeleteTarget(s)} className="text-gray-500 hover:text-red-600" title="Delete">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-1.5">
+                          {perm.update && (
+                            <button
+                              onClick={() => openEdit(s)}
+                              className="p-1.5 text-amber-600 bg-amber-50 hover:bg-amber-100 hover:text-amber-700 rounded-md transition-colors border border-amber-200 inline-flex items-center justify-center"
+                              title="Edit Subject"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          {perm.update && (
+                            <button
+                              onClick={() => { setAssignTarget(s); setSelectedTeachers(s.teacher_ids || []); setAssignOpen(true); }}
+                              className="p-1.5 text-teal-600 bg-teal-50 hover:bg-teal-100 hover:text-teal-700 rounded-md transition-colors border border-teal-200 inline-flex items-center justify-center"
+                              title="Manage Teachers"
+                            >
+                              <Tag className="h-4 w-4" />
+                            </button>
+                          )}
+                          {perm.del && (
+                            <button
+                              onClick={() => setDeleteTarget(s)}
+                              className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 rounded-md transition-colors border border-red-200 inline-flex items-center justify-center"
+                              title="Delete Subject"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>

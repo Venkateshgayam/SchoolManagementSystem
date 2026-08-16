@@ -41,8 +41,14 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
     ).scalar_one_or_none()
     if not teacher:
         return set()
-    result = await db.execute(select(Class.id).where(Class.teacher_id == teacher.id))
-    return set(result.scalars().all())
+    from app.models.schedule import Schedule
+    # 1. Homeroom classes
+    homeroom_res = await db.execute(select(Class.id).where(Class.teacher_id == teacher.id))
+    class_ids = set(homeroom_res.scalars().all())
+    # 2. Schedule classes
+    sched_res = await db.execute(select(Schedule.class_id).where(Schedule.teacher_id == teacher.id))
+    class_ids.update(sched_res.scalars().all())
+    return class_ids
 
 
 @router.get("/me", response_model=StudentResponse)

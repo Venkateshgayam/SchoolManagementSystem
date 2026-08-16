@@ -6,6 +6,7 @@ import React from "react";
 import { BookOpen, Users, Save, PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Paperclip, Award, FileText, Plus, Tag, Pencil, X } from "lucide-react";
 import api from "@/lib/api";
 import { useSettings } from "@/hooks/useSettings";
+import { calculateLiveGrade } from "@/lib/gradeUtils";
 import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import toast from "react-hot-toast";
@@ -44,7 +45,7 @@ interface SubjectInfo {
   id: number;
   name: string;
   code: string | null;
-  teacher_id: number | null;
+  teacher_ids: number[];
 }
 
 interface ExamSubjectSlot {
@@ -58,6 +59,7 @@ interface ExamSubjectSlot {
 interface ExamInfo {
   id: number;
   name: string;
+  class_id: number | null;
   academic_year: string | null;
   total_marks: number | null;
   slots: ExamSubjectSlot[];
@@ -71,6 +73,7 @@ export default function TeacherExamsPage() {
   const [exams, setExams] = useState<ExamInfo[]>([]);
   const [students, setStudents] = useState<StudentInfo[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
+  const [grades, setGrades] = useState<any[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null); // slot ID
   const [gradeInputs, setGradeInputs] = useState<Record<number, string>>({});
   const [gradingId, setGradingId] = useState<number | null>(null);
@@ -85,6 +88,7 @@ export default function TeacherExamsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [formName, setFormName] = useState("");
+  const [formClassId, setFormClassId] = useState<number | "">("");
   const [formAcademicYear, setFormAcademicYear] = useState("");
   const [formTotalMarks, setFormTotalMarks] = useState("");
   const [formSlots, setFormSlots] = useState<Partial<ExamSubjectSlot>[]>([]);
@@ -97,13 +101,16 @@ export default function TeacherExamsPage() {
   useEffect(() => {
     async function fetchAll() {
       try {
-        const [teacherRes, classesRes, subjectsRes, examsRes, studentsRes, submissionsRes] = await Promise.all([
+        const [teacherRes, classesRes, subjectsRes, examsRes, studentsRes, submissionsRes, gradesRes] = await Promise.all([
           api.get("/teachers/me").catch(() => ({ data: null })),
           api.get("/classes/").catch(() => ({ data: [] })),
+          // Fetch ALL subjects (admin endpoint returns all) for name resolution.
+          // The backend already filters /exams/ to only this teacher's exams.
           api.get("/subjects/").catch(() => ({ data: [] })),
           api.get("/exams/").catch(() => ({ data: [] })),
           api.get("/students/").catch(() => ({ data: [] })),
           api.get("/exam-submissions/").catch(() => ({ data: [] })),
+          api.get("/grades/").catch(() => ({ data: [] })),
         ]);
 
         setTeacher(teacherRes.data);
@@ -112,6 +119,7 @@ export default function TeacherExamsPage() {
         setExams(examsRes.data);
         setStudents(studentsRes.data);
         setSubmissions(submissionsRes.data);
+        setGrades(gradesRes.data);
       } catch (err: any) {
         setError(err?.message || "Failed to load exams");
       } finally {
@@ -132,6 +140,7 @@ export default function TeacherExamsPage() {
 
   const resetForm = () => {
     setFormName("");
+    setFormClassId("");
     setFormAcademicYear("");
     setFormTotalMarks("");
     setFormSlots([]);
@@ -146,6 +155,7 @@ export default function TeacherExamsPage() {
   const openEdit = (e: ExamInfo) => {
     setEditing(e);
     setFormName(e.name);
+    setFormClassId(e.class_id || "");
     setFormAcademicYear(e.academic_year || "");
     setFormTotalMarks(e.total_marks ? String(e.total_marks) : "");
     setFormSlots(e.slots.map(s => {
@@ -178,8 +188,8 @@ export default function TeacherExamsPage() {
   };
 
   const handleSubmit = async () => {
-    if (!formName) {
-      toast.error("Exam name is required.");
+    if (!formName || formClassId === "") {
+      toast.error("Exam name and class are required.");
       return;
     }
     
@@ -207,6 +217,7 @@ export default function TeacherExamsPage() {
 
       const payload = {
         name: formName,
+        class_id: formClassId,
         academic_year: formAcademicYear || null,
         total_marks: formTotalMarks ? Number(formTotalMarks) : null,
         slots: slotsPayload
@@ -246,12 +257,14 @@ export default function TeacherExamsPage() {
     if (!val || isNaN(Number(val))) return;
     setGradingId(submissionId);
     try {
-      await api.put(`/exam-submissions/${submissionId}/grade`, { grade: Number(val) });
-      const res = await api.get("/exam-submissions/");
-      setSubmissions(res.data);
-      setGradeInputs((prev) => ({ ...prev, [submissionId]: "" }));
+      const res = await api.put(`/exam-submissions/${submissionId}/grade`, { grade: Number(gradeInputs[submissionId]) });
+      setSubmissions((prev) => prev.map((s) => (s.id === submissionId ? res.data : s)));
+      // Refresh grades
+      const gradesRes = await api.get("/grades/");
+      setGrades(gradesRes.data);
+      toast.success("Marks saved");
     } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to update grade");
+      toast.error(err?.response?.data?.detail || "Failed to save marks");
     } finally {
       setGradingId(null);
     }
@@ -261,15 +274,13 @@ export default function TeacherExamsPage() {
   if (error) return <div className="card max-w-lg mx-auto text-center py-8"><p className="text-gray-600 mb-4">{error}</p><button onClick={() => window.location.reload()} className="btn-primary">Retry</button></div>;
   if (!teacher) return <div className="card max-w-lg mx-auto text-center py-8"><p className="text-gray-600">Teacher profile not available.</p></div>;
 
-  const teacherSubjects = subjects.filter(s => s.teacher_id === teacher.id).map(s => s.id);
-  
-  // Flatten slots and include parent exam info, filter by subjects taught by the teacher
-  const mySlots = exams.flatMap(exam => 
+  // The backend /exams/ endpoint already filters to only the exams whose slots
+  // cover subjects this teacher is assigned to (via teacher_subjects M2M).
+  // Do NOT re-filter by teacherSubjects here — that would use the Schedule-based
+  // /subjects/ endpoint which may return an empty list if no schedules exist.
+  const mySlots = exams.flatMap(exam =>
     (exam.slots || []).map(slot => ({ ...slot, exam }))
-  ).filter(slot => teacherSubjects.includes(slot.subject_id));
-
-  // Filter subjects down to only those taught by this teacher
-  const assignedSubjects = subjects.filter(s => s.teacher_id === teacher.id);
+  );
 
   return (
     <div>
@@ -286,8 +297,8 @@ export default function TeacherExamsPage() {
             <Award className="h-5 w-5" /> Managed Exams
           </h2>
         </div>
-        {exams.filter(e => e.slots.some(s => teacherSubjects.includes(s.subject_id))).length === 0 ? (
-          <p className="text-gray-500 text-sm">No exams found that include your subjects.</p>
+        {exams.length === 0 ? (
+          <p className="text-gray-500 text-sm">No managed exams found.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -300,7 +311,7 @@ export default function TeacherExamsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {exams.filter(e => e.slots.some(s => teacherSubjects.includes(s.subject_id))).map((e) => (
+                {exams.map((e) => (
                   <tr key={e.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><Tag className="h-4 w-4 inline mr-1 text-gray-400" />{e.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -387,19 +398,45 @@ export default function TeacherExamsPage() {
                                 <h4 className="text-sm font-semibold text-gray-800">Student Submissions</h4>
                               </div>
                               <ul className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                                {students.map((student) => {
-                                    const submission = submissions.find(
-                                      (sub) => sub.exam_subject_slot_id === slot.id && sub.student_id === student.id
-                                    );
-                                    
-                                    if (!submission) return null; // Only show students who have submitted something or all? Let's show all for now since exam applies to everyone. Actually no, let's just show who submitted.
+                                {(() => {
+                                  const classStudents = students.filter((s) => !slot.exam.class_id || s.class_id === slot.exam.class_id);
+                                  const slotSubmissions = submissions.filter((sub) => sub.exam_subject_slot_id === slot.id);
+                                  
+                                  if (classStudents.length === 0 && slotSubmissions.length === 0) {
+                                    return <li className="p-4 text-sm text-gray-500 text-center">No students or submissions found for this exam slot.</li>;
+                                  }
 
-                                    return (
-                                      <li key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                                        <div className="flex-1">
-                                          <p className="text-sm font-medium text-gray-900 mb-1">
-                                            {student.full_name || `Student #${student.id}`} {student.roll_number ? `(${student.roll_number})` : ""}
-                                          </p>
+                                  const renderedStudentIds = new Set<number>();
+                                  const items: { student: StudentInfo; submission: SubmissionRecord | undefined; gradeRecord: any }[] = [];
+
+                                  for (const student of classStudents) {
+                                    renderedStudentIds.add(student.id);
+                                    const submission = slotSubmissions.find((sub) => sub.student_id === student.id);
+                                    const gradeRecord = grades.find((g) => g.exam_id === slot.exam.id && g.subject_id === slot.subject_id && g.student_id === student.id);
+                                    items.push({ student, submission, gradeRecord });
+                                  }
+
+                                  for (const submission of slotSubmissions) {
+                                    if (!renderedStudentIds.has(submission.student_id)) {
+                                      const student = students.find((s) => s.id === submission.student_id) || {
+                                        id: submission.student_id,
+                                        user_id: 0,
+                                        full_name: `Student #${submission.student_id}`,
+                                        roll_number: null,
+                                        class_id: null,
+                                      };
+                                      const gradeRecord = grades.find((g) => g.exam_id === slot.exam.id && g.subject_id === slot.subject_id && g.student_id === submission.student_id);
+                                      items.push({ student, submission, gradeRecord });
+                                    }
+                                  }
+
+                                  return items.map(({ student, submission, gradeRecord }) => (
+                                    <li key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium text-gray-900 mb-1">
+                                          {student.full_name || `Student #${student.id}`} {student.roll_number ? `(${student.roll_number})` : ""}
+                                        </p>
+                                        {submission ? (
                                           <div className="mt-2 text-sm text-gray-600 bg-gray-50 rounded p-3 border border-gray-100">
                                             {submission.submission_text ? (
                                               <p className="whitespace-pre-wrap">{submission.submission_text}</p>
@@ -429,37 +466,54 @@ export default function TeacherExamsPage() {
                                               </div>
                                             )}
                                           </div>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end">
-                                          <span className="text-xs text-gray-500 block mb-2">
-                                            {new Date(submission.submitted_at).toLocaleString()}
+                                        ) : (
+                                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            Not submitted
                                           </span>
-                                          <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-md border border-gray-200">
-                                            <input
-                                              type="number"
-                                              step="1"
-                                              min="0"
-                                              max={slot.exam.total_marks || settings.default_exam_marks_scale || 100}
-                                              value={gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "")}
-                                              onChange={(e) => setGradeInputs({ ...gradeInputs, [submission.id]: e.target.value })}
-                                              placeholder={`/ ${slot.exam.total_marks || settings.default_exam_marks_scale || 100}`}
-                                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                                            />
-                                            <button
-                                              onClick={() => handleGrade(submission.id)}
-                                              disabled={gradingId === submission.id || !gradeInputs[submission.id]}
-                                              className="px-3 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
-                                            >
-                                              {gradingId === submission.id ? "..." : "Save"}
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </li>
-                                    );
-                                  })}
-                                {students.filter(student => submissions.some(sub => sub.exam_subject_slot_id === slot.id && sub.student_id === student.id)).length === 0 && (
-                                  <li className="p-4 text-sm text-gray-500 text-center">No submissions yet for this slot.</li>
-                                )}
+                                        )}
+                                      </div>
+                                      <div className="text-right flex flex-col items-end">
+                                        {submission && (
+                                          <>
+                                            <span className="text-xs text-gray-500 block mb-2">
+                                              {new Date(submission.submitted_at).toLocaleString()}
+                                            </span>
+                                            <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-md border border-gray-200">
+                                              <span className="text-sm font-medium text-gray-700 ml-1">Marks:</span>
+                                              <input
+                                                type="number"
+                                                step="1"
+                                                min="0"
+                                                max={slot.exam.total_marks || settings.default_exam_marks_scale || 100}
+                                                value={gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "")}
+                                                onChange={(e) => setGradeInputs({ ...gradeInputs, [submission.id]: e.target.value })}
+                                                placeholder={`/ ${slot.exam.total_marks || settings.default_exam_marks_scale || 100}`}
+                                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                              />
+                                              <button
+                                                onClick={() => handleGrade(submission.id)}
+                                                disabled={gradingId === submission.id || !gradeInputs[submission.id]}
+                                                className="px-3 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                                              >
+                                                {gradingId === submission.id ? "..." : "Save"}
+                                              </button>
+                                              {(() => {
+                                                const inputVal = gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "");
+                                                const maxMarks = slot.exam.total_marks || settings.default_exam_marks_scale || 100;
+                                                const liveGrade = calculateLiveGrade(inputVal, maxMarks, settings.grading_scale) || gradeRecord?.letter_grade;
+                                                return liveGrade ? (
+                                                  <span className="ml-2 font-bold text-lg text-primary-700">
+                                                    Grade: {liveGrade}
+                                                  </span>
+                                                ) : null;
+                                              })()}
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    </li>
+                                  ));
+                                })()}
                               </ul>
                             </div>
                           </td>
@@ -517,6 +571,21 @@ export default function TeacherExamsPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Class</label>
+            <select
+              value={formClassId}
+              onChange={(e) => setFormClassId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Select class</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.section || ""}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">Academic Year</label>
@@ -564,7 +633,7 @@ export default function TeacherExamsPage() {
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                       >
                         <option value="">Select subject</option>
-                        {assignedSubjects.map(s => (
+                        {subjects.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>

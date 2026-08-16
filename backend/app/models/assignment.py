@@ -30,6 +30,8 @@ class Assignment(Base):
     subject = relationship("Subject", backref="assignments")
     class_ref = relationship("Class", backref="assignments")
     teacher = relationship("Teacher", backref="assignments")
+    submissions = relationship("AssignmentSubmission", back_populates="assignment", cascade="all, delete-orphan", passive_deletes=True)
+    grades = relationship("Grade", back_populates="assignment", cascade="all, delete-orphan", passive_deletes=True)
 
     def __repr__(self) -> str:
         return f"<Assignment(id={self.id}, title={self.title})>"

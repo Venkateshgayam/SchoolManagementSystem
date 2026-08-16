@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Plus, User } from "lucide-react";
+import { Bell, Plus, User, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
@@ -20,7 +20,21 @@ export default function AdminNotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form, setForm] = useState({ user_id: "", title: "", message: "", type: "general" });
+
+  const handleDelete = async (id: number) => {
+    setDeletingId(id);
+    try {
+      await api.delete(`/notifications/${id}`);
+      setNotifications((prev) => prev.filter((x) => x.id !== id));
+      toast.success("Notification deleted");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err?.message || "Could not delete notification");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const load = async () => {
     try {
@@ -83,6 +97,14 @@ export default function AdminNotificationsPage() {
                   {n.message && <p className="text-sm text-gray-600 truncate">{n.message}</p>}
                   <p className="text-xs text-gray-500 mt-1"><User className="h-3 w-3 inline mr-1" />{n.type || "general"} · {new Date(n.created_at).toLocaleString()}</p>
                 </div>
+                <button
+                  onClick={() => handleDelete(n.id)}
+                  disabled={deletingId === n.id}
+                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors shrink-0 mt-0.5"
+                  title="Delete notification"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </li>
             ))}
           </ul>

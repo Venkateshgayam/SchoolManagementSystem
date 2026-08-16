@@ -5,6 +5,7 @@ from typing import Optional, List
 
 class ExamSubjectSlotBase(BaseModel):
     subject_id: int
+    teacher_id: Optional[int] = None
     date: datetime
     start_time: datetime
     end_time: datetime
@@ -23,6 +24,7 @@ class ExamSubjectSlotResponse(ExamSubjectSlotBase):
 
 class ExamCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
+    class_id: int = Field(...)
     academic_year: Optional[str] = Field(None, max_length=20)
     total_marks: Optional[float] = None
     created_by: Optional[int] = None
@@ -31,6 +33,7 @@ class ExamCreate(BaseModel):
 
 class ExamUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+    class_id: Optional[int] = None
     academic_year: Optional[str] = Field(None, max_length=20)
     total_marks: Optional[float] = None
     slots: Optional[List[ExamSubjectSlotCreate]] = None
@@ -39,6 +42,7 @@ class ExamUpdate(BaseModel):
 class ExamResponse(BaseModel):
     id: int
     name: str
+    class_id: Optional[int] = None
     academic_year: Optional[str] = None
     total_marks: Optional[float] = None
     created_by: Optional[int] = None

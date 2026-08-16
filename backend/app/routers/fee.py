@@ -45,6 +45,8 @@ async def _populate_amount_due(fee: Fee, db: AsyncSession) -> FeeResponse:
     # Auto-calculate status
     if fee.amount_paid >= total_fee and total_fee > 0:
         fee.status = FeeStatusEnum.PAID
+    elif fee.due_date and datetime.utcnow().date() > fee.due_date and amount_due > 0:
+        fee.status = FeeStatusEnum.OVERDUE
     elif fee.amount_paid > 0:
         fee.status = FeeStatusEnum.PARTIAL
     else:
@@ -70,6 +72,7 @@ async def _populate_amount_due(fee: Fee, db: AsyncSession) -> FeeResponse:
 
 @router.get("/", response_model=List[FeeResponse])
 async def list_fees(
+    status: Optional[str] = None,
     current_user: dict = Depends(require_role("admin", "student")),
     db: AsyncSession = Depends(get_db)):
     query = select(Fee).options(selectinload(Fee.student).selectinload(Student.class_ref))
@@ -79,7 +82,17 @@ async def list_fees(
     else:
         result = await db.execute(query)
     fees = result.scalars().all()
-    return [await _populate_amount_due(f, db) for f in fees]
+    populated_fees = [await _populate_amount_due(f, db) for f in fees]
+    if status:
+        st = status.upper()
+        if st == "OVERDUE":
+            today = datetime.utcnow().date()
+            return [f for f in populated_fees if f.status == FeeStatusEnum.OVERDUE or (f.due_date and f.due_date < today and f.status != FeeStatusEnum.PAID)]
+        elif st == "UNPAID":
+            return [f for f in populated_fees if f.status == FeeStatusEnum.PENDING]
+        else:
+            return [f for f in populated_fees if f.status == st]
+    return populated_fees
 
 
 @router.get("/{fee_id}", response_model=FeeResponse)

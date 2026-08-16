@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { ClipboardList, Clock, CheckCircle, Send, Paperclip, X, FileText, Image as ImageIcon } from "lucide-react";
 import api from "@/lib/api";
 import { useSettings } from "@/hooks/useSettings";
+import { calculateLiveGrade } from "@/lib/gradeUtils";
 
 interface AssignmentRecord {
   id: number;
@@ -14,6 +15,7 @@ interface AssignmentRecord {
   class_id: number | null;
   teacher_id: number | null;
   due_date: string | null;
+  total_marks?: number | null;
   attachment_url: string | null;
   created_at: string;
 }
@@ -37,6 +39,7 @@ export default function StudentAssignmentsPage() {
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
   const [subjects, setSubjects] = useState<SubjectInfo[]>([]);
+  const [grades, setGrades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
@@ -49,11 +52,12 @@ export default function StudentAssignmentsPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [assignmentsRes, studentRes, submissionsRes, subjectsRes] = await Promise.all([
+        const [assignmentsRes, studentRes, submissionsRes, subjectsRes, gradesRes] = await Promise.all([
           api.get("/assignments/").catch(() => ({ data: [] })),
           api.get("/students/me").catch(() => ({ data: null })),
           api.get("/assignment-submissions").catch(() => ({ data: [] })),
           api.get("/subjects/").catch(() => ({ data: [] })),
+          api.get("/grades/").catch(() => ({ data: [] })),
         ]);
 
         const student = studentRes.data;
@@ -63,6 +67,7 @@ export default function StudentAssignmentsPage() {
         setAssignments(filteredAssignments);
         setSubmissions(submissionsRes.data);
         setSubjects(subjectsRes.data);
+        setGrades(gradesRes.data);
       } catch (err: any) {
         setError(err?.message || "Failed to load assignments");
       } finally {
@@ -269,9 +274,21 @@ export default function StudentAssignmentsPage() {
                     <div className="flex items-center gap-2 mt-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <span className="text-sm text-green-600">Submitted</span>
-                      {submission?.grade !== null && submission?.grade !== undefined && (
-                        <span className="text-sm text-gray-500">· Marks: {submission.grade} / {maxAssignmentMarks}</span>
-                      )}
+                      {submission?.grade !== null && submission?.grade !== undefined && (() => {
+                        const gradeRecord = grades.find((g) => g.assignment_id === assignment.id);
+                        const maxMarks = assignment.total_marks || maxAssignmentMarks;
+                        const letterGrade = gradeRecord?.letter_grade || calculateLiveGrade(submission.grade, maxMarks, settings.grading_scale);
+                        return (
+                          <span className="text-sm text-gray-500 flex items-center gap-2">
+                            <span>· Marks: {submission.grade} / {maxMarks}</span>
+                            {letterGrade && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary-100 text-primary-800">
+                                Grade: {letterGrade}
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

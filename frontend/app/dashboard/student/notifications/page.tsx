@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Trash2 } from "lucide-react";
 import api from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface NotificationRecord {
   id: number;
@@ -19,6 +20,7 @@ export default function StudentNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -48,6 +50,21 @@ export default function StudentNotificationsPage() {
       setError("Failed to update notification");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const deleteNotification = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    setDeletingId(id);
+    try {
+      await api.delete(`/notifications/${id}`);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      window.dispatchEvent(new Event("notifications-updated"));
+      toast.success("Notification deleted");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to delete notification");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -98,13 +115,23 @@ export default function StudentNotificationsPage() {
                 onClick={() => markRead(notification)}
                 className={`card ${!notification.is_read ? "border-l-4 border-l-primary-500 cursor-pointer hover:shadow-md transition-shadow" : ""}`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-gray-900">{notification.title}</h3>
-                  {!notification.is_read && (
-                    <span className="ml-2 flex-shrink-0 text-xs font-medium text-primary-600">
-                      {updatingId === notification.id ? "Marking read..." : "Click to mark as read"}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!notification.is_read && (
+                      <span className="text-xs font-medium text-primary-600">
+                        {updatingId === notification.id ? "Marking read..." : "Click to mark as read"}
+                      </span>
+                    )}
+                    <button
+                      onClick={(e) => deleteNotification(e, notification.id)}
+                      disabled={deletingId === notification.id}
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                      title="Delete notification"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 {notification.message && (
                   <p className="mt-1 text-sm text-gray-600">{notification.message}</p>

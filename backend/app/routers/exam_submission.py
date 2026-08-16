@@ -18,6 +18,16 @@ from app.core.settings import get_setting
 router = APIRouter(prefix="/exam-submissions", tags=["exam_submissions"])
 
 
+async def _teacher_subject_ids(db: AsyncSession, current_user: dict) -> set:
+    from app.models.teacher import Teacher
+    teacher = (
+        await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
+    ).scalar_one_or_none()
+    if not teacher:
+        return set()
+    from app.routers.exam import _teacher_subject_ids_all_sources
+    return await _teacher_subject_ids_all_sources(db, teacher.id)
+
 @router.get("/", response_model=List[ExamSubmissionResponse])
 async def list_exam_submissions(
     current_user: dict = Depends(require_role("admin", "teacher", "student")),
@@ -27,6 +37,27 @@ async def list_exam_submissions(
         student = await get_current_student(current_user=current_user, db=db)
         result = await db.execute(
             select(ExamSubmission).where(ExamSubmission.student_id == student.id)
+        )
+    elif role == "teacher":
+        from app.models.teacher import Teacher
+        teacher = (
+            await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
+        ).scalar_one_or_none()
+        subject_ids = await _teacher_subject_ids(db, current_user)
+        
+        from sqlalchemy import or_
+        filters = []
+        if subject_ids:
+            filters.append(ExamSubjectSlot.subject_id.in_(subject_ids))
+        if teacher:
+            filters.append(ExamSubjectSlot.teacher_id == teacher.id)
+        filters.append(Exam.created_by == int(current_user["sub"]))
+
+        result = await db.execute(
+            select(ExamSubmission)
+            .join(ExamSubjectSlot, ExamSubmission.exam_subject_slot_id == ExamSubjectSlot.id)
+            .join(Exam, ExamSubjectSlot.exam_id == Exam.id)
+            .where(or_(*filters))
         )
     else:
         result = await db.execute(select(ExamSubmission))
@@ -118,6 +149,18 @@ async def grade_exam_submission(
         raise HTTPException(status_code=400, detail="Invalid exam slot")
         
     exam = (await db.execute(select(Exam).where(Exam.id == slot.exam_id))).scalar_one_or_none()
+
+    if current_user.get("role") == "teacher":
+        from app.models.teacher import Teacher
+        teacher = (
+            await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
+        ).scalar_one_or_none()
+        subject_ids = await _teacher_subject_ids(db, current_user)
+        is_subject_teacher = slot.subject_id in subject_ids
+        is_slot_teacher = (slot.teacher_id == teacher.id) if teacher else False
+        is_exam_creator = (exam.created_by == int(current_user["sub"])) if exam else False
+        if not (is_subject_teacher or is_slot_teacher or is_exam_creator):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot grade submission for an exam/subject you do not teach")
     # Use the exam's stored total_marks if available; fall back to the configurable default_exam_marks_scale setting
     max_marks = exam.total_marks if exam and exam.total_marks else float(await get_setting(db, "default_exam_marks_scale", 100.0))
     

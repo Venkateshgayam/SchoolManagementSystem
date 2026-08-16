@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, CheckCheck, MailOpen } from "lucide-react";
+import { Bell, CheckCheck, MailOpen, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StatCard from "@/components/dashboard/StatCard";
@@ -29,6 +29,7 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<number | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = async () => {
     try {
@@ -38,6 +39,20 @@ export default function NotificationsPage() {
       setError(err?.message || "Failed to load notifications");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (n: NotificationRecord) => {
+    setDeletingId(n.id);
+    try {
+      await api.delete(`/notifications/${n.id}`);
+      setNotifications((prev) => prev.filter((x) => x.id !== n.id));
+      notifyNavbar();
+      toast.success("Notification deleted");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err?.message || "Could not delete notification");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -110,11 +125,21 @@ export default function NotificationsPage() {
                   {n.message && <p className="text-sm text-gray-600 truncate">{n.message}</p>}
                   <p className="text-xs text-gray-500 mt-1">{n.type || "general"} · {new Date(n.created_at).toLocaleString()}</p>
                 </button>
-                {!n.is_read && (
-                  <button onClick={() => handleRead(n)} disabled={markingId === n.id} className="text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0 mt-0.5" title="Mark as read">
-                    {markingId === n.id ? "…" : "Mark read"}
+                <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                  {!n.is_read && (
+                    <button onClick={() => handleRead(n)} disabled={markingId === n.id} className="text-xs font-medium text-blue-600 hover:text-blue-800" title="Mark as read">
+                      {markingId === n.id ? "…" : "Mark read"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(n)}
+                    disabled={deletingId === n.id}
+                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Delete notification"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
-                )}
+                </div>
               </li>
             ))}
           </ul>

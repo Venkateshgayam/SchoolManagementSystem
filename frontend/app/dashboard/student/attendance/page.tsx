@@ -2,7 +2,7 @@
 import { formatDate } from "@/lib/formatters";
 
 import { useState, useEffect } from "react";
-import { ClipboardList, Calendar, TrendingUp } from "lucide-react";
+import { ClipboardList, Calendar, TrendingUp, Filter } from "lucide-react";
 import api from "@/lib/api";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
@@ -26,6 +26,11 @@ export default function StudentAttendancePage() {
   const [classInfo, setClassInfo] = useState<ClassInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Default to current month (YYYY-MM)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    return new Date().toLocaleDateString('en-CA').slice(0, 7);
+  });
 
   useEffect(() => {
     async function fetchAttendance() {
@@ -54,8 +59,25 @@ export default function StudentAttendancePage() {
     fetchAttendance();
   }, []);
 
-  const { total, present, absent, late, rate: attendancePercent } = calculateAttendanceStats(attendance);
+  // Filter records by selected month (or all)
+  const filteredAttendance = selectedMonth === "all"
+    ? attendance
+    : attendance.filter((r) => r.date.startsWith(selectedMonth));
+
+  const { total, present, absent, late, rate: attendancePercent } = calculateAttendanceStats(filteredAttendance);
   const formattedPercent = Math.round(attendancePercent);
+
+  // Format month label e.g. "August 2026"
+  const getMonthLabel = (monthStr: string) => {
+    if (monthStr === "all") return "All Time";
+    try {
+      const [y, m] = monthStr.split("-").map(Number);
+      const date = new Date(y, m - 1, 1);
+      return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    } catch {
+      return monthStr;
+    }
+  };
 
   if (loading) {
     return (
@@ -78,34 +100,85 @@ export default function StudentAttendancePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">My Attendance</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Attendance</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Viewing records for <span className="font-semibold text-primary-700">{getMonthLabel(selectedMonth)}</span>
+          </p>
+        </div>
+
+        {/* Month Selector Filter */}
+        <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+          <Calendar className="h-4 w-4 text-gray-500 shrink-0 ml-1" />
+          <div className="flex items-center gap-2">
+            <input
+              type="month"
+              value={selectedMonth === "all" ? "" : selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value || "all")}
+              className="text-sm border border-gray-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(selectedMonth === "all" ? new Date().toLocaleDateString('en-CA').slice(0, 7) : "all")}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                selectedMonth === "all"
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {selectedMonth === "all" ? "Current Month" : "All Months"}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <div className="card text-center">
-          <p className="text-sm font-medium text-gray-500">Overall</p>
+          <p className="text-sm font-medium text-gray-500">
+            {selectedMonth === "all" ? "Overall Rate" : `${getMonthLabel(selectedMonth)} Rate`}
+          </p>
           <p className="mt-2 text-3xl font-bold text-gray-900">{formattedPercent}%</p>
+          <p className="text-xs text-gray-400 mt-1">{total} day(s) recorded</p>
         </div>
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Present</p>
           <p className="mt-2 text-3xl font-bold text-green-600">{present}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {total > 0 ? `${Math.round((present / total) * 100)}% of month` : "—"}
+          </p>
         </div>
         <div className="card text-center">
           <p className="text-sm font-medium text-gray-500">Absent</p>
           <p className="mt-2 text-3xl font-bold text-red-600">{absent}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {total > 0 ? `${Math.round((absent / total) * 100)}% of month` : "—"}
+          </p>
         </div>
       </div>
 
       {late > 0 && (
         <div className="card mb-6">
-          <p className="text-sm font-medium text-gray-500">Late</p>
+          <p className="text-sm font-medium text-gray-500">Late Arrivals in {getMonthLabel(selectedMonth)}</p>
           <p className="mt-2 text-2xl font-bold text-yellow-600">{late}</p>
         </div>
       )}
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Attendance History</h2>
-        {attendance.length === 0 ? (
-          <p className="text-gray-600">No attendance records found.</p>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Attendance Records ({getMonthLabel(selectedMonth)})
+          </h2>
+          <span className="text-xs text-gray-500 font-medium">
+            {filteredAttendance.length} record(s)
+          </span>
+        </div>
+
+        {filteredAttendance.length === 0 ? (
+          <div className="text-center py-8">
+            <ClipboardList className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-600">No attendance records found for {getMonthLabel(selectedMonth)}.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -116,7 +189,7 @@ export default function StudentAttendancePage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {attendance
+                {filteredAttendance
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                   .map((record) => (
                     <tr key={record.id}>
@@ -125,7 +198,7 @@ export default function StudentAttendancePage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${
                             record.status === "present"
                               ? "bg-green-100 text-green-800"
                               : record.status === "absent"

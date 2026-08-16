@@ -249,17 +249,29 @@ export default function ClassesManager() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><Users className="h-4 w-4 inline mr-1 text-gray-400" />{teacherName(c.teacher_id)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                        <Link href={`/dashboard/${role}/classes/${c.id}`} className="text-gray-500 hover:text-blue-600 mr-3 inline-block" title="Click here for class details">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/dashboard/${role}/classes/${c.id}`}
+                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 rounded-md transition-colors border border-blue-200 inline-flex items-center justify-center"
+                          title="Click here for class details"
+                        >
                           <Eye className="h-4 w-4" />
                         </Link>
                         {perm.update && (
-                          <button onClick={() => openEdit(c)} className="text-gray-500 hover:text-primary-600 mr-3 inline-block" title="Edit">
+                          <button
+                            onClick={() => openEdit(c)}
+                            className="p-1.5 text-amber-600 bg-amber-50 hover:bg-amber-100 hover:text-amber-700 rounded-md transition-colors border border-amber-200 inline-flex items-center justify-center"
+                            title="Edit Class"
+                          >
                             <Pencil className="h-4 w-4" />
                           </button>
                         )}
                         {perm.del && (
-                          <button onClick={() => setDeleteTarget(c)} className="text-gray-500 hover:text-red-600 inline-block" title="Delete">
+                          <button
+                            onClick={() => setDeleteTarget(c)}
+                            className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 rounded-md transition-colors border border-red-200 inline-flex items-center justify-center"
+                            title="Delete Class"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}

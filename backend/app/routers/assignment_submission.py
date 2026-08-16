@@ -16,13 +16,17 @@ from app.core.dependencies import require_role, get_current_student
 router = APIRouter(prefix="/assignment-submissions", tags=["assignment_submissions"])
 
 
-async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
+async def _teacher_subject_ids(db: AsyncSession, current_user: dict) -> set:
     teacher = (
         await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
     ).scalar_one_or_none()
     if not teacher:
         return set()
-    result = await db.execute(select(Class.id).where(Class.teacher_id == teacher.id))
+    from app.models.subject import teacher_subjects
+    result = await db.execute(
+        select(teacher_subjects.c.subject_id)
+        .where(teacher_subjects.c.teacher_id == teacher.id)
+    )
     return set(result.scalars().all())
 
 
@@ -38,12 +42,12 @@ async def list_assignment_submissions(
         )
     elif role == "teacher":
         from app.models.assignment import Assignment
-        class_ids = await _teacher_class_ids(db, current_user)
-        if not class_ids:
+        subject_ids = await _teacher_subject_ids(db, current_user)
+        if not subject_ids:
             return []
         result = await db.execute(
             select(AssignmentSubmission).join(Assignment, AssignmentSubmission.assignment_id == Assignment.id)
-            .where(Assignment.class_id.in_(class_ids))
+            .where(Assignment.subject_id.in_(subject_ids))
         )
     else:
         result = await db.execute(select(AssignmentSubmission))
@@ -118,17 +122,50 @@ async def grade_assignment_submission(
     ).scalar_one_or_none()
 
     if current_user.get("role") == "teacher":
-        class_ids = await _teacher_class_ids(db, current_user)
-        if not assignment or assignment.class_id not in class_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot grade submission for a class you do not teach")
+        subject_ids = await _teacher_subject_ids(db, current_user)
+        if not assignment or assignment.subject_id not in subject_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot grade submission for a subject you do not teach")
             
     from app.core.settings import get_setting
-    max_marks = await get_setting(db, "default_assignment_marks_scale", 30.0)
+    max_marks = assignment.total_marks if assignment and assignment.total_marks else float(await get_setting(db, "default_assignment_marks_scale", 30.0))
     
     if request.grade < 0 or request.grade > max_marks:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Grade must be between 0 and {max_marks}")
         
     submission.grade = request.grade
+    
+    # Also sync to Grades table
+    from app.models.grade import Grade
+    from app.routers.grade import calculate_letter_grade
+    
+    existing_grade = (await db.execute(
+        select(Grade).where(
+            Grade.student_id == submission.student_id,
+            Grade.subject_id == assignment.subject_id,
+            Grade.assignment_id == assignment.id
+        )
+    )).scalar_one_or_none()
+    
+    percentage = (submission.grade / max_marks) * 100
+    letter_grade = await calculate_letter_grade(percentage, db)
+
+    if existing_grade:
+        existing_grade.marks_obtained = submission.grade
+        existing_grade.total_marks = max_marks
+        existing_grade.percentage = percentage
+        existing_grade.letter_grade = letter_grade
+    else:
+        new_grade = Grade(
+            student_id=submission.student_id,
+            subject_id=assignment.subject_id,
+            assignment_id=assignment.id,
+            marks_obtained=submission.grade,
+            total_marks=max_marks,
+            percentage=percentage,
+            letter_grade=letter_grade
+        )
+        db.add(new_grade)
+        
     await db.commit()
     await db.refresh(submission)
     return submission

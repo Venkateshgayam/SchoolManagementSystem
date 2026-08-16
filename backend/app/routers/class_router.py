@@ -26,11 +26,9 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
 async def list_classes(
     current_user: dict = Depends(require_role("admin", "teacher", "student")),
     db: AsyncSession = Depends(get_db)):
-    if current_user.get("role") == "teacher":
-        class_ids = await _teacher_class_ids(db, current_user)
-        if not class_ids:
-            return []
-        result = await db.execute(select(Class).where(Class.id.in_(class_ids)))
+    # Teachers and Admins can see all classes
+    if current_user.get("role") in ("admin", "teacher"):
+        result = await db.execute(select(Class))
     elif current_user.get("role") == "student":
         student = (await db.execute(select(Student).where(Student.user_id == int(current_user["sub"])))).scalar_one_or_none()
         if student and student.class_id:
@@ -52,11 +50,8 @@ async def get_class(
     class_obj = result.scalar_one_or_none()
     if not class_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
-    if current_user.get("role") == "teacher":
-        class_ids = await _teacher_class_ids(db, current_user)
-        if class_id not in class_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    elif current_user.get("role") == "student":
+    # Teachers and Admins can access any class details
+    if current_user.get("role") == "student":
         student = (await db.execute(select(Student).where(Student.user_id == int(current_user["sub"])))).scalar_one_or_none()
         if not student or student.class_id != class_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")

@@ -8,6 +8,7 @@ import Modal from "@/components/dashboard/Modal";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import toast from "react-hot-toast";
 import { useSettings } from "@/hooks/useSettings";
+import { calculateLiveGrade } from "@/lib/gradeUtils";
 
 interface TeacherInfo {
   id: number;
@@ -43,6 +44,7 @@ interface SubjectInfo {
   id: number;
   name: string;
   code: string | null;
+  teacher_ids: number[];
 }
 
 interface AssignmentInfo {
@@ -65,6 +67,7 @@ export default function TeacherAssignmentsPage() {
   const [assignments, setAssignments] = useState<AssignmentInfo[]>([]);
   const [students, setStudents] = useState<StudentInfo[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
+  const [grades, setGrades] = useState<any[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [gradeInputs, setGradeInputs] = useState<Record<number, string>>({});
   const [gradingId, setGradingId] = useState<number | null>(null);
@@ -92,21 +95,22 @@ export default function TeacherAssignmentsPage() {
 
   const fetchAll = async () => {
     try {
-      const [teacherRes, classesRes, subjectsRes, assignmentsRes, studentsRes, submissionsRes] = await Promise.all([
-        api.get("/teachers/me").catch(() => ({ data: null })),
-        api.get("/classes/").catch(() => ({ data: [] })),
-        api.get("/subjects/").catch(() => ({ data: [] })),
-        api.get("/assignments/").catch(() => ({ data: [] })),
-        api.get("/students/").catch(() => ({ data: [] })),
-        api.get("/assignment-submissions").catch(() => ({ data: [] })),
-      ]);
-
-      setTeacher(teacherRes.data);
-      setClasses(classesRes.data);
-      setSubjects(subjectsRes.data);
-      setAssignments(assignmentsRes.data);
-      setStudents(studentsRes.data);
-      setSubmissions(submissionsRes.data);
+      const [a, c, s, t, st, sub, gr] = await Promise.all([
+          api.get("/assignments/").catch(() => ({ data: [] })),
+          api.get("/classes/").catch(() => ({ data: [] })),
+          api.get("/subjects/").catch(() => ({ data: [] })),
+          api.get("/teachers/me").catch(() => ({ data: null })),
+          api.get("/students/").catch(() => ({ data: [] })),
+          api.get("/assignment-submissions/").catch(() => ({ data: [] })),
+          api.get("/grades/").catch(() => ({ data: [] })),
+        ]);
+        setAssignments(a.data);
+        setClasses(c.data);
+        setSubjects(s.data);
+        setTeacher(t.data);
+        setStudents(st.data);
+        setSubmissions(sub.data);
+        setGrades(gr.data);
     } catch (err: any) {
       setError(err?.message || "Failed to load assignments");
     } finally {
@@ -118,10 +122,8 @@ export default function TeacherAssignmentsPage() {
     fetchAll();
   }, []);
 
-  const teacherClasses = classes.filter((c) => c.teacher_id === teacher?.id);
-  const myAssignments = assignments.filter((a) =>
-    teacherClasses.some((c) => c.id === a.class_id)
-  );
+  // The backend already filters assignments for the logged-in teacher
+  const myAssignments = assignments;
 
   const toggleExpand = (assignmentId: number) => {
     setExpandedId(expandedId === assignmentId ? null : assignmentId);
@@ -132,12 +134,14 @@ export default function TeacherAssignmentsPage() {
     if (!val || isNaN(Number(val))) return;
     setGradingId(submissionId);
     try {
-      await api.put(`/assignment-submissions/${submissionId}/grade`, { grade: Number(val) });
-      const res = await api.get("/assignment-submissions");
-      setSubmissions(res.data);
-      setGradeInputs((prev) => ({ ...prev, [submissionId]: "" }));
+      const res = await api.put(`/assignment-submissions/${submissionId}/grade`, { grade: Number(gradeInputs[submissionId]) });
+      setSubmissions((prev) => prev.map((s) => (s.id === submissionId ? res.data : s)));
+      // Refresh grades to show calculated letter_grade
+      const gradesRes = await api.get("/grades/");
+      setGrades(gradesRes.data);
+      toast.success("Marks saved");
     } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to update marks");
+      toast.error(err?.response?.data?.detail || "Failed to save marks");
     } finally {
       setGradingId(null);
     }
@@ -206,9 +210,16 @@ export default function TeacherAssignmentsPage() {
     setDeleting(true);
     try {
       await api.delete(`/assignments/${deleteTarget.id}`);
+      toast.success("Assignment deleted successfully");
       setDeleteTarget(null);
-      const res = await api.get("/assignments/");
+      const [res, subRes, grRes] = await Promise.all([
+        api.get("/assignments/").catch(() => ({ data: [] })),
+        api.get("/assignment-submissions/").catch(() => ({ data: [] })),
+        api.get("/grades/").catch(() => ({ data: [] })),
+      ]);
       setAssignments(res.data);
+      setSubmissions(subRes.data);
+      setGrades(grRes.data);
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || "Failed to delete assignment");
     } finally {
@@ -360,6 +371,9 @@ export default function TeacherAssignmentsPage() {
                                     const submission = submissions.find(
                                       (sub) => sub.assignment_id === a.id && sub.student_id === student.id
                                     );
+                                    const gradeRecord = grades.find(
+                                      (g) => g.assignment_id === a.id && g.student_id === student.id
+                                    );
                                     return (
                                       <li key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                         <div className="flex-1">
@@ -409,6 +423,7 @@ export default function TeacherAssignmentsPage() {
                                                 {new Date(submission.submitted_at).toLocaleString()}
                                               </span>
                                               <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-md border border-gray-200">
+                                                <span className="text-sm font-medium text-gray-700 ml-1">Marks:</span>
                                                 <input
                                                   type="number"
                                                   step="1"
@@ -426,6 +441,16 @@ export default function TeacherAssignmentsPage() {
                                                 >
                                                   {gradingId === submission.id ? "..." : "Save"}
                                                 </button>
+                                                {(() => {
+                                                  const inputVal = gradeInputs[submission.id] !== undefined ? gradeInputs[submission.id] : (submission.grade ?? "");
+                                                  const maxMarks = a.total_marks || settings.default_assignment_marks_scale || 30;
+                                                  const liveGrade = calculateLiveGrade(inputVal, maxMarks, settings.grading_scale) || gradeRecord?.letter_grade;
+                                                  return liveGrade ? (
+                                                    <span className="ml-2 font-bold text-lg text-primary-700">
+                                                      Grade: {liveGrade}
+                                                    </span>
+                                                  ) : null;
+                                                })()}
                                               </div>
                                             </>
                                           )}
@@ -460,7 +485,7 @@ export default function TeacherAssignmentsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">Select class</option>
-                {teacherClasses.map((c) => (
+                {classes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.section || ""}
                   </option>
@@ -560,7 +585,7 @@ export default function TeacherAssignmentsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete Assignment"
-        message={`Are you sure you want to delete ${deleteTarget?.title}? This will also delete all student submissions for it. This cannot be undone.`}
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? This will permanently delete the assignment along with all student submissions, attachments, and associated grades. This action cannot be undone.`}
         loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}

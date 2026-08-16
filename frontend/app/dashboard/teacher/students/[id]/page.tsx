@@ -79,6 +79,9 @@ export default function StudentProfilePage() {
   const [exams, setExams] = useState<ExamInfo[]>([]);
   const [overallResult, setOverallResult] = useState<OverallResultData | null>(null);
   const [selectedExamId, setSelectedExamId] = useState<number | "">("");
+  const [selectedAttendanceMonth, setSelectedAttendanceMonth] = useState(() => {
+    return new Date().toLocaleDateString('en-CA').slice(0, 7);
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,6 +154,10 @@ export default function StudentProfilePage() {
   }
 
   const { rate: attendanceRate, present, late, absent } = calculateAttendanceStats(attendance);
+
+  const filteredStudentAttendance = selectedAttendanceMonth === "all"
+    ? attendance
+    : attendance.filter((a) => a.date.startsWith(selectedAttendanceMonth));
 
   const avgGrade = grades.length === 0 ? 0 :
     grades.reduce((sum, g) => sum + (g.percentage ?? (g.marks_obtained / g.total_marks) * 100), 0) / grades.length;
@@ -287,9 +294,27 @@ export default function StudentProfilePage() {
           </div>
 
           <div className="card">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Attendance</h2>
-            {attendance.length === 0 ? (
-              <p className="text-gray-600 text-sm">No attendance records found.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Attendance Records</h2>
+              <div className="flex items-center gap-2">
+                <input
+                  type="month"
+                  value={selectedAttendanceMonth === "all" ? "" : selectedAttendanceMonth}
+                  onChange={(e) => setSelectedAttendanceMonth(e.target.value || "all")}
+                  className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedAttendanceMonth(selectedAttendanceMonth === "all" ? new Date().toLocaleDateString('en-CA').slice(0, 7) : "all")}
+                  className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  {selectedAttendanceMonth === "all" ? "Current" : "All"}
+                </button>
+              </div>
+            </div>
+
+            {filteredStudentAttendance.length === 0 ? (
+              <p className="text-gray-600 text-sm">No attendance records found for this period.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -300,7 +325,7 @@ export default function StudentProfilePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {attendance.slice(0, 10).map(a => (
+                    {filteredStudentAttendance.slice(0, 31).map(a => (
                       <tr key={a.id}>
                         <td className="px-4 py-3 text-sm text-gray-900">{formatDate(a.date)}</td>
                         <td className="px-4 py-3 text-sm">
