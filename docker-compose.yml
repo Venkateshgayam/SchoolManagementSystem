@@ -3,38 +3,26 @@ services:
     image: postgres:16-alpine
     container_name: sms_postgres
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - ./backend/.env
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sms_backend
     restart: unless-stopped
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      JWT_ALGORITHM: ${JWT_ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
-      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
-      ENVIRONMENT: ${ENVIRONMENT}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}
-      EMAILS_FROM_NAME: ${EMAILS_FROM_NAME}
+    env_file:
+      - ./backend/.env
     ports:
       - "8000:8000"
     depends_on:
@@ -44,18 +32,20 @@ services:
       - ./backend:/app
       - uploads_data:/app/uploads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: sms_frontend
     restart: unless-stopped
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    env_file:
+      - ./frontend/.env.local
     ports:
       - "3000:3000"
     depends_on:
       - backend
+
 volumes:
   postgres_data:
   uploads_data:
