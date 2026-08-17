@@ -232,7 +232,7 @@ export default function AdminAttendancePage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Mark daily attendance and review historical monthly records
+            Mark daily attendance and review historical records by date or month
           </p>
         </div>
 
@@ -272,27 +272,30 @@ export default function AdminAttendancePage() {
             {getMonthLabel(selectedMonth)} Rate
           </p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{monthRate.toFixed(1)}%</p>
-          <p className="text-xs text-gray-400 mt-0.5">{monthTotal} total mark(s)</p>
+          <p className="text-xs text-gray-500 mt-0.5" title="Attended count includes Present and Late arrivals">
+            Attended: {monthPresent + monthLate} of {monthTotal}
+            {monthTotal > 0 ? ` (${monthPresent} present + ${monthLate} late)` : ""}
+          </p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-gray-500 uppercase">Present</p>
           <p className="mt-2 text-2xl font-bold text-green-600">{monthPresent}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {monthTotal > 0 ? `${Math.round((monthPresent / monthTotal) * 100)}%` : "0%"}
+            {monthTotal > 0 ? `${Math.round((monthPresent / monthTotal) * 100)}% on time` : "0%"}
           </p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-gray-500 uppercase">Absent</p>
           <p className="mt-2 text-2xl font-bold text-red-600">{monthAbsent}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {monthTotal > 0 ? `${Math.round((monthAbsent / monthTotal) * 100)}%` : "0%"}
+            {monthTotal > 0 ? `${Math.round((monthAbsent / monthTotal) * 100)}% unexcused` : "0%"}
           </p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-gray-500 uppercase">Late</p>
           <p className="mt-2 text-2xl font-bold text-yellow-600">{monthLate}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {monthTotal > 0 ? `${Math.round((monthLate / monthTotal) * 100)}%` : "0%"}
+            {monthTotal > 0 ? `${Math.round((monthLate / monthTotal) * 100)}% (attended)` : "0%"}
           </p>
         </div>
       </div>
