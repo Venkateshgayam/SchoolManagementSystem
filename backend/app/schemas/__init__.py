@@ -18,6 +18,7 @@ from app.schemas.notification import NotificationCreate, NotificationUpdate, Not
 from app.schemas.document import DocumentCreate, DocumentUpdate, DocumentResponse
 from app.schemas.user import UserAdminUpdate
 from app.schemas.audit_log import AuditLogResponse
+from app.schemas.holiday import HolidayCreate, HolidayResponse, HolidayCalendarEntry
 
 __all__ = [
     "LoginRequest",
@@ -75,4 +76,7 @@ __all__ = [
     "DocumentResponse",
     "UserAdminUpdate",
     "AuditLogResponse",
+    "HolidayCreate",
+    "HolidayResponse",
+    "HolidayCalendarEntry",
 ]

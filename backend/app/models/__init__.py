@@ -22,6 +22,7 @@ from app.models.audit_log import AuditLog
 from app.models.exam_submission import ExamSubmission
 from app.models.system_setting import SystemSetting
 from app.models.teacher_class_assignment import TeacherClassAssignment
+from app.models.holiday import Holiday
 
 __all__ = [
     "User",
@@ -51,4 +52,5 @@ __all__ = [
     "SystemSetting",
     "ExamSubjectSlot",
     "TeacherClassAssignment",
+    "Holiday",
 ]

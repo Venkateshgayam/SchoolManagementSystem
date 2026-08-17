@@ -14,6 +14,7 @@ from app.utils.audit import write_audit_log
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
 
+from app.models.holiday import Holiday
 from app.models.teacher_class_assignment import TeacherClassAssignment
 
 async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
@@ -34,6 +35,126 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
 
 
 import calendar
+from datetime import datetime, date as dt_date
+from sqlalchemy import or_
+
+
+async def calculate_attendance_stats_db(
+    db: AsyncSession,
+    student_id: Optional[int] = None,
+    class_id: Optional[int] = None,
+    month: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> dict:
+    """
+    Calculates attendance statistics excluding Sundays, recurring weekday holidays,
+    and specific-date holidays for the relevant class or school-wide.
+    """
+    att_query = select(Attendance)
+    if student_id:
+        att_query = att_query.where(Attendance.student_id == student_id)
+    if class_id:
+        att_query = att_query.where(Attendance.class_id == class_id)
+    if month:
+        try:
+            parts = month.split("-")
+            y, m = int(parts[0]), int(parts[1])
+            _, last_day = calendar.monthrange(y, m)
+            att_query = att_query.where(Attendance.date >= f"{y:04d}-{m:02d}-01", Attendance.date <= f"{y:04d}-{m:02d}-{last_day:02d}")
+        except Exception:
+            pass
+    if start_date:
+        att_query = att_query.where(Attendance.date >= start_date)
+    if end_date:
+        att_query = att_query.where(Attendance.date <= end_date)
+
+    att_result = await db.execute(att_query)
+    records = att_result.scalars().all()
+
+    # Fetch holidays (school-wide + class-specific)
+    hol_query = select(Holiday)
+    if class_id:
+        hol_query = hol_query.where(or_(Holiday.class_id.is_(None), Holiday.class_id == class_id))
+    hol_result = await db.execute(hol_query)
+    holidays = hol_result.scalars().all()
+
+    recurring_days = {h.day.capitalize() for h in holidays if h.type == "recurring" and h.day}
+    specific_dates = {h.date.isoformat() if hasattr(h.date, "isoformat") else str(h.date) for h in holidays if h.type == "specific" and h.date}
+
+    unique_records = {}
+    for r in records:
+        d_str = r.date.isoformat() if hasattr(r.date, "isoformat") else str(r.date)
+        try:
+            parsed_d = datetime.strptime(d_str, "%Y-%m-%d").date()
+        except Exception:
+            parsed_d = None
+
+        # Exclude Sundays (weekday 6 in python: 0=Mon, ..., 6=Sun)
+        if parsed_d and parsed_d.weekday() == 6:
+            continue
+        # Exclude recurring weekday holidays
+        if parsed_d and parsed_d.strftime("%A") in recurring_days:
+            continue
+        # Exclude specific holiday dates
+        if d_str in specific_dates:
+            continue
+
+        key = (r.student_id, d_str)
+        status_val = (r.status or "").lower()
+        if key not in unique_records:
+            unique_records[key] = status_val
+        else:
+            existing = unique_records[key]
+            if existing == "absent" and (status_val in ["present", "late"]):
+                unique_records[key] = status_val
+            elif existing == "late" and status_val == "present":
+                unique_records[key] = status_val
+
+    present = sum(1 for s in unique_records.values() if s == "present")
+    late = sum(1 for s in unique_records.values() if s == "late")
+    absent = sum(1 for s in unique_records.values() if s == "absent")
+    total = present + late + absent
+    rate = round(((present + late) / total) * 100, 2) if total > 0 else 0.0
+
+    return {
+        "total": total,
+        "present": present,
+        "late": late,
+        "absent": absent,
+        "rate": rate,
+    }
+
+
+@router.get("/stats")
+async def get_attendance_stats(
+    student_id: Optional[int] = None,
+    class_id: Optional[int] = None,
+    month: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: dict = Depends(require_role("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db),
+):
+    role = current_user.get("role")
+    if role == "student":
+        student = await get_current_student(current_user=current_user, db=db)
+        student_id = student.id
+        class_id = student.class_id
+    elif role == "teacher" and class_id:
+        class_ids = await _teacher_class_ids(db, current_user)
+        if class_id not in class_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    return await calculate_attendance_stats_db(
+        db=db,
+        student_id=student_id,
+        class_id=class_id,
+        month=month,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
 
 @router.get("/", response_model=List[AttendanceResponse])
 async def list_attendance(

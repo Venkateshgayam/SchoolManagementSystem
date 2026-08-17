@@ -23,3 +23,4 @@ from app.routers.assignment_submission import router as assignment_submission_ro
 from app.routers.system_setting import router as system_setting_router
 from app.routers.result import router as result_router
 from app.routers.teacher_class_assignment import router as teacher_class_assignment_router
+from app.routers.holiday import router as holiday_router

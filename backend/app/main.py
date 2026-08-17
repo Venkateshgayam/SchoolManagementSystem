@@ -30,6 +30,7 @@ from app.routers import (
     assignment_submission_router,
     result_router,
     teacher_class_assignment_router,
+    holiday_router,
 )
 
 from fastapi.staticfiles import StaticFiles
@@ -78,6 +79,7 @@ app.include_router(exam_submission_router, prefix="/api", tags=["exam_submission
 app.include_router(assignment_submission_router, prefix="/api", tags=["assignment_submissions"])
 app.include_router(result_router, prefix="/api", tags=["results"])
 app.include_router(teacher_class_assignment_router, prefix="/api", tags=["teacher_class_assignments"])
+app.include_router(holiday_router, prefix="/api", tags=["holidays"])
 
 
 @app.on_event("startup")
