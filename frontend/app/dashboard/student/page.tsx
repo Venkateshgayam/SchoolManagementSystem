@@ -4,8 +4,9 @@ import { formatDate } from "@/lib/formatters";
 import { useState, useEffect } from "react";
 import PageLoader from "@/components/dashboard/PageLoader";
 import StatCard from "@/components/dashboard/StatCard";
-import { CreditCard, ClipboardList, FileText, AlertCircle, AlertTriangle } from "lucide-react";
+import { CreditCard, ClipboardList, FileText, AlertCircle, AlertTriangle, Clock, Calendar, ArrowRight } from "lucide-react";
 import api from "@/lib/api";
+import Link from "next/link";
 import { useSettings } from "@/hooks/useSettings";
 import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
 
@@ -99,6 +100,20 @@ interface SubjectInfo {
   name: string;
 }
 
+interface ScheduleRecord {
+  id: number;
+  class_id: number;
+  subject_id: number;
+  teacher_id: number | null;
+  room: string | null;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const dayMap: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 };
+
 export default function StudentDashboard() {
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [assignmentsData, setAssignmentsData] = useState<AssignmentRecord[]>([]);
@@ -107,6 +122,7 @@ export default function StudentDashboard() {
   const [announcementsData, setAnnouncementsData] = useState<AnnouncementRecord[]>([]);
   const [notificationsData, setNotificationsData] = useState<NotificationRecord[]>([]);
   const [feesData, setFeesData] = useState<FeeRecord[]>([]);
+  const [schedulesData, setSchedulesData] = useState<ScheduleRecord[]>([]);
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null);
   const [classInfo, setClassInfo] = useState<ClassInfo | null>(null);
   const [subjectsData, setSubjectsData] = useState<SubjectInfo[]>([]);
@@ -136,6 +152,7 @@ export default function StudentDashboard() {
           studentRes,
           classesRes,
           subjectsRes,
+          schedulesRes,
         ] = await Promise.all([
           api.get("/attendance/").catch(() => ({ data: [] })),
           api.get("/assignments/").catch(() => ({ data: [] })),
@@ -147,6 +164,7 @@ export default function StudentDashboard() {
           api.get("/students/me").catch(() => ({ data: null })),
           api.get("/classes/").catch(() => ({ data: [] })),
           api.get("/subjects/").catch(() => ({ data: [] })),
+          api.get("/schedules/").catch(() => ({ data: [] })),
         ]);
 
         const student = studentRes.data;
@@ -170,6 +188,11 @@ export default function StudentDashboard() {
           );
           setAssignmentsData(assignments);
           setSubmissionsData(submissionsRes.data);
+
+          const classSchedules = schedulesRes.data.filter(
+            (s: ScheduleRecord) => s.class_id === student.class_id
+          );
+          setSchedulesData(classSchedules);
 
           if (student.class_id && classesRes.data.length > 0) {
             const cls = classesRes.data.find((c: ClassInfo) => c.id === student.class_id);
@@ -247,6 +270,16 @@ export default function StudentDashboard() {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
 
+  const now = new Date();
+  const todayDow = dayMap[now.getDay()];
+  const todaySchedules = schedulesData
+    .filter((s) => s.day_of_week === todayDow)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+  const getSubjectName = (subjectId: number) => {
+    return subjectsData.find((s) => s.id === subjectId)?.name || `Subject ${subjectId}`;
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Student Dashboard</h1>
@@ -279,6 +312,49 @@ export default function StudentDashboard() {
           icon={CreditCard}
           trend={feesCardTrend}
         />
+      </div>
+
+      {/* Today's Schedule Card */}
+      <div className="card mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary-600" />
+            Today's Schedule ({dayNames[todayDow]})
+          </h2>
+          <Link
+            href="/dashboard/student/schedule"
+            className="text-sm text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
+          >
+            Full Timetable <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {todaySchedules.length === 0 ? (
+          <div className="py-6 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+            <Calendar className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 font-medium">No classes scheduled for today.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {todaySchedules.map((s) => (
+              <div
+                key={s.id}
+                className="p-3.5 bg-gray-50 hover:bg-gray-100/80 rounded-lg border border-gray-200 transition-colors"
+              >
+                <p className="font-semibold text-gray-900">{getSubjectName(s.subject_id)}</p>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-primary-600" />
+                  <span>{s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}</span>
+                </p>
+                {s.room && (
+                  <p className="text-xs text-gray-600 mt-1 font-medium">
+                    Room {s.room}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

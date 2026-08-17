@@ -21,6 +21,7 @@ from app.models.document import Document
 from app.models.audit_log import AuditLog
 from app.models.exam_submission import ExamSubmission
 from app.models.system_setting import SystemSetting
+from app.models.teacher_class_assignment import TeacherClassAssignment
 
 __all__ = [
     "User",
@@ -49,4 +50,5 @@ __all__ = [
     "ExamSubmission",
     "SystemSetting",
     "ExamSubjectSlot",
+    "TeacherClassAssignment",
 ]

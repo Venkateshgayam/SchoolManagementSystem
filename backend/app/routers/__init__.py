@@ -18,8 +18,8 @@ from app.routers.notification import router as notification_router
 from app.routers.documents import router as document_router
 from app.routers.users import router as user_router
 from app.routers.audit_logs import router as audit_log_router
-
 from app.routers.exam_submission import router as exam_submission_router
 from app.routers.assignment_submission import router as assignment_submission_router
 from app.routers.system_setting import router as system_setting_router
 from app.routers.result import router as result_router
+from app.routers.teacher_class_assignment import router as teacher_class_assignment_router

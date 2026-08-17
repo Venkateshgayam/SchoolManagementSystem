@@ -21,8 +21,6 @@ import {
 
 const menuItems = [
   { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/teacher/classes", label: "My Classes", icon: BookOpen },
-  { href: "/dashboard/teacher/students", label: "My Students", icon: UserCheck },
   { href: "/dashboard/teacher/attendance", label: "Attendance", icon: ClipboardList },
   { href: "/dashboard/teacher/assignments", label: "Assignments", icon: FileText },
   { href: "/dashboard/teacher/exams", label: "Examinations", icon: Award },

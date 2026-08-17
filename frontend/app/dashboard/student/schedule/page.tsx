@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, Clock, MapPin } from "lucide-react";
+import { BookOpen, Clock, MapPin, Calendar } from "lucide-react";
 import api from "@/lib/api";
+import PageLoader from "@/components/dashboard/PageLoader";
 
 interface ScheduleRecord {
   id: number;
@@ -65,13 +66,7 @@ export default function StudentSchedulePage() {
     return acc;
   }, {});
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading timetable...</div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader label="Loading timetable..." />;
 
   if (error) {
     return (
@@ -86,12 +81,16 @@ export default function StudentSchedulePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Timetable</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">My Class Timetable</h1>
+        <p className="text-sm text-gray-500 mt-1">Weekly schedule of periods and classrooms</p>
+      </div>
 
       {schedule.length === 0 ? (
-        <div className="card text-center py-8">
+        <div className="card text-center py-12">
           <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600">No schedule entries found.</p>
+          <h3 className="text-base font-semibold text-gray-900 mb-1">No Schedule Available</h3>
+          <p className="text-sm text-gray-500">Your class timetable has not been published yet.</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -101,27 +100,33 @@ export default function StudentSchedulePage() {
               const dayIndex = parseInt(day);
               const entries = groupedSchedule[dayIndex];
               return (
-                <div key={day}>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">{dayNames[dayIndex]}</h2>
-                  <div className="space-y-3">
+                <div key={day} className="card">
+                  <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-primary-600"></span>
+                    {dayNames[dayIndex]}
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {entries
                       .sort((a, b) => a.start_time.localeCompare(b.start_time))
                       .map((entry) => (
-                        <div key={entry.id} className="card flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Clock className="h-5 w-5 text-primary-600" />
-                            <div>
-                              <p className="font-medium text-gray-900">{getSubjectName(entry.subject_id)}</p>
-                              <p className="text-sm text-gray-500">
-                                {entry.start_time} - {entry.end_time}
-                              </p>
-                            </div>
+                        <div
+                          key={entry.id}
+                          className="p-3.5 bg-gray-50 rounded-lg border border-gray-200 shadow-2xs hover:border-gray-300 transition-colors"
+                        >
+                          <p className="font-semibold text-gray-900 text-sm">
+                            {getSubjectName(entry.subject_id)}
+                          </p>
+                          <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+                            <span className="flex items-center gap-1 font-medium text-gray-700">
+                              <Clock className="h-3.5 w-3.5 text-primary-600" />
+                              {entry.start_time.slice(0, 5)} - {entry.end_time.slice(0, 5)}
+                            </span>
+                            {entry.room && (
+                              <span className="flex items-center gap-1 font-medium bg-white px-2 py-0.5 rounded border border-gray-200">
+                                <MapPin className="h-3 w-3 text-gray-400" /> Room {entry.room}
+                              </span>
+                            )}
                           </div>
-                          {entry.room && (
-                            <div className="flex items-center gap-1 text-sm text-gray-500">
-                              <MapPin className="h-4 w-4" /> {entry.room}
-                            </div>
-                          )}
                         </div>
                       ))}
                   </div>

@@ -13,14 +13,23 @@ from app.core.dependencies import require_role
 router = APIRouter(prefix="/curriculum", tags=["curriculum"])
 
 
+from app.models.teacher_class_assignment import TeacherClassAssignment
+
 async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
     teacher = (
         await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
     ).scalar_one_or_none()
     if not teacher:
         return set()
-    result = await db.execute(select(Class.id).where(Class.teacher_id == teacher.id))
-    return set(result.scalars().all())
+    assigned_res = await db.execute(
+        select(TeacherClassAssignment.class_id).where(TeacherClassAssignment.teacher_id == teacher.id)
+    )
+    assigned_ids = set(assigned_res.scalars().all())
+    homeroom_res = await db.execute(
+        select(Class.id).where(Class.teacher_id == teacher.id)
+    )
+    homeroom_ids = set(homeroom_res.scalars().all())
+    return assigned_ids | homeroom_ids
 
 @router.get("/", response_model=List[CurriculumResponse])
 async def list_curriculum(

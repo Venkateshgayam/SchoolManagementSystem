@@ -9,6 +9,8 @@ from app.models.student import Student
 from app.schemas.class_schema import ClassCreate, ClassUpdate, ClassResponse
 from app.core.dependencies import require_role
 
+from app.models.teacher_class_assignment import TeacherClassAssignment
+
 router = APIRouter(prefix="/classes", tags=["classes"])
 
 
@@ -18,8 +20,15 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
     ).scalar_one_or_none()
     if not teacher:
         return set()
-    result = await db.execute(select(Class.id).where(Class.teacher_id == teacher.id))
-    return set(result.scalars().all())
+    assigned_res = await db.execute(
+        select(TeacherClassAssignment.class_id).where(TeacherClassAssignment.teacher_id == teacher.id)
+    )
+    assigned_ids = set(assigned_res.scalars().all())
+    homeroom_res = await db.execute(
+        select(Class.id).where(Class.teacher_id == teacher.id)
+    )
+    homeroom_ids = set(homeroom_res.scalars().all())
+    return assigned_ids | homeroom_ids
 
 
 @router.get("/", response_model=List[ClassResponse])

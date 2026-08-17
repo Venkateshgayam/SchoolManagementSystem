@@ -40,14 +40,23 @@ async def _notify_exam_students(db: AsyncSession, exam: Exam, title: str, messag
 router = APIRouter(prefix="/exams", tags=["exams"])
 
 
+from app.models.teacher_class_assignment import TeacherClassAssignment
+
 async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
     teacher = (
         await db.execute(select(Teacher).where(Teacher.user_id == int(current_user["sub"])))
     ).scalar_one_or_none()
     if not teacher:
         return set()
-    result = await db.execute(select(Class.id).where(Class.teacher_id == teacher.id))
-    return set(result.scalars().all())
+    assigned_res = await db.execute(
+        select(TeacherClassAssignment.class_id).where(TeacherClassAssignment.teacher_id == teacher.id)
+    )
+    assigned_ids = set(assigned_res.scalars().all())
+    homeroom_res = await db.execute(
+        select(Class.id).where(Class.teacher_id == teacher.id)
+    )
+    homeroom_ids = set(homeroom_res.scalars().all())
+    return assigned_ids | homeroom_ids
 
 
 async def _teacher_subject_ids_all_sources(db: AsyncSession, teacher_id: int) -> set[int]:

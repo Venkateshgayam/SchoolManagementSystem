@@ -469,6 +469,16 @@ async def seed_data():
         )
         db.add(notification)
 
+        from app.models.teacher_class_assignment import TeacherClassAssignment
+        teacher_assignments = [
+            TeacherClassAssignment(teacher_id=teacher1.id, class_id=class_1.id, subject_id=math_subject.id),
+            TeacherClassAssignment(teacher_id=teacher1.id, class_id=class_2.id, subject_id=math_subject.id),
+            TeacherClassAssignment(teacher_id=teacher2.id, class_id=class_1.id, subject_id=english_subject.id),
+            TeacherClassAssignment(teacher_id=teacher2.id, class_id=class_2.id, subject_id=english_subject.id),
+            TeacherClassAssignment(teacher_id=teacher3.id, class_id=class_3.id, subject_id=physics_subject.id),
+        ]
+        db.add_all(teacher_assignments)
+
         await db.commit()
 
         print("Seed data created successfully.")

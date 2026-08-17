@@ -42,10 +42,15 @@ async def _teacher_class_ids(db: AsyncSession, current_user: dict) -> set:
     if not teacher:
         return set()
     from app.models.schedule import Schedule
-    # 1. Homeroom classes
+    from app.models.teacher_class_assignment import TeacherClassAssignment
+    class_ids = set()
+    # 1. Assigned classes
+    assign_res = await db.execute(select(TeacherClassAssignment.class_id).where(TeacherClassAssignment.teacher_id == teacher.id))
+    class_ids.update(assign_res.scalars().all())
+    # 2. Homeroom classes
     homeroom_res = await db.execute(select(Class.id).where(Class.teacher_id == teacher.id))
-    class_ids = set(homeroom_res.scalars().all())
-    # 2. Schedule classes
+    class_ids.update(homeroom_res.scalars().all())
+    # 3. Schedule classes
     sched_res = await db.execute(select(Schedule.class_id).where(Schedule.teacher_id == teacher.id))
     class_ids.update(sched_res.scalars().all())
     return class_ids
