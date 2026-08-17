@@ -1,4 +1,4 @@
-from datetime import datetime, date
+import datetime as dt
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, Literal, Union
 
@@ -8,7 +8,7 @@ class HolidayCreate(BaseModel):
 
     type: str  # "recurring" or "specific"
     day: Optional[str] = None
-    date: Optional[Union[date, str]] = None
+    date: Optional[dt.date] = None
     class_id: Optional[int] = Field(None, alias="classId")
     reason: Optional[str] = Field(None, max_length=255)
 
@@ -28,11 +28,20 @@ class HolidayCreate(BaseModel):
     def validate_date(cls, v):
         if v is None or (isinstance(v, str) and not v.strip()):
             return None
+        if isinstance(v, dt.date):
+            return v
         if isinstance(v, str):
+            v_clean = v.strip()
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+                try:
+                    return dt.datetime.strptime(v_clean, fmt).date()
+                except ValueError:
+                    continue
             try:
-                return datetime.strptime(v.strip(), "%Y-%m-%d").date()
+                return dt.date.fromisoformat(v_clean)
             except ValueError:
-                raise ValueError("Invalid date format. Use YYYY-MM-DD")
+                pass
+            raise ValueError("Invalid date format. Use YYYY-MM-DD or DD/MM/YYYY")
         return v
 
 
@@ -42,11 +51,11 @@ class HolidayResponse(BaseModel):
     id: int
     type: str
     day: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[dt.date] = None
     class_id: Optional[int] = None
     reason: Optional[str] = None
     created_by: Optional[int] = None
-    created_at: datetime
+    created_at: dt.datetime
 
 
 class HolidayCalendarEntry(BaseModel):
@@ -57,3 +66,4 @@ class HolidayCalendarEntry(BaseModel):
     reason: Optional[str] = None
     type: str  # "recurring" or "specific"
     class_id: Optional[int] = None
+

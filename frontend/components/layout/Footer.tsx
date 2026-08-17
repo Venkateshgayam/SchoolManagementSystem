@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSettings } from "@/hooks/useSettings";
 
 export default function Footer() {
@@ -20,18 +21,18 @@ export default function Footer() {
           <div>
             <h3 className="font-semibold text-sm uppercase tracking-wider text-gray-300 mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="/" className="hover:text-primary-400 transition-colors">Home</a></li>
-              <li><a href="/about" className="hover:text-primary-400 transition-colors">About</a></li>
-              <li><a href="/contact" className="hover:text-primary-400 transition-colors">Contact</a></li>
+              <li><Link href="/" className="hover:text-primary-400 transition-colors">Home</Link></li>
+              <li><Link href="/about" className="hover:text-primary-400 transition-colors">About</Link></li>
+              <li><Link href="/contact" className="hover:text-primary-400 transition-colors">Contact</Link></li>
             </ul>
           </div>
           <div>
             <h3 className="font-semibold text-sm uppercase tracking-wider text-gray-300 mb-4">Academics</h3>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="/" className="hover:text-primary-400 transition-colors">Curriculum</a></li>
-              <li><a href="/" className="hover:text-primary-400 transition-colors">Classes & Subjects</a></li>
-              <li><a href="/" className="hover:text-primary-400 transition-colors">Examination</a></li>
-              <li><a href="/" className="hover:text-primary-400 transition-colors">Academic Calendar</a></li>
+              <li><Link href="/curriculum" className="hover:text-primary-400 transition-colors">Curriculum</Link></li>
+              <li><Link href="/classes-subjects" className="hover:text-primary-400 transition-colors">Classes & Subjects</Link></li>
+              <li><Link href="/examination" className="hover:text-primary-400 transition-colors">Examination</Link></li>
+              <li><Link href="/academic-calendar" className="hover:text-primary-400 transition-colors">Academic Calendar</Link></li>
             </ul>
           </div>
         </div>

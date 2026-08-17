@@ -217,7 +217,7 @@ export default function StudentExamsPage() {
               const notStarted = isBeforeStart(slot);
 
               return (
-                <div key={slot.id} className="card border border-primary-100 shadow-sm">
+                <div key={slot.id} className="card">
                   <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
