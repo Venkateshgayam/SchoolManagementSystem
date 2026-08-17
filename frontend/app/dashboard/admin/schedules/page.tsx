@@ -145,10 +145,10 @@ export default function AdminSchedulesPage() {
   const [formEndTime, setFormEndTime] = useState("10:00");
 
   // Holiday management modal & form states
-  const [holidayToggleDay, setHolidayToggleDay] = useState<{ index: number; name: string } | null>(null);
-  const [holidayReasonInput, setHolidayReasonInput] = useState("");
-  const [holidayScopeSchoolWide, setHolidayScopeSchoolWide] = useState(false);
-  const [savingHoliday, setSavingHoliday] = useState(false);
+  const [holidayFormType, setHolidayFormType] = useState<"specific" | "recurring">("specific");
+  const [recurringDay, setRecurringDay] = useState<string>("Saturday");
+  const [recurringReason, setRecurringReason] = useState("");
+  const [submittingRecurring, setSubmittingRecurring] = useState(false);
   const [deleteHolidayTarget, setDeleteHolidayTarget] = useState<HolidayRecord | null>(null);
   const [deletingHoliday, setDeletingHoliday] = useState(false);
 
@@ -232,12 +232,28 @@ export default function AdminSchedulesPage() {
     return schedules.filter((s) => s.class_id === selectedClassId);
   }, [schedules, selectedClassId]);
 
-  // Recurring holidays that apply to the selected class (class-specific or school-wide)
+  // Recurring holidays that apply school-wide
   const activeRecurringHolidays = useMemo(() => {
-    return holidays.filter(
-      (h) => h.type === "recurring" && (h.class_id === null || h.class_id === selectedClassId)
-    );
-  }, [holidays, selectedClassId]);
+    return holidays.filter((h) => h.type === "recurring");
+  }, [holidays]);
+
+  // Real calendar dates for current week (Monday-Saturday)
+  const currentWeekDates = useMemo(() => {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
+    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+
+    return DAYS.map((day) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + day.index);
+      return {
+        ...day,
+        formattedDate: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      };
+    });
+  }, []);
 
   const getHolidayForDay = (dayName: string) => {
     return activeRecurringHolidays.find(
@@ -277,20 +293,12 @@ export default function AdminSchedulesPage() {
     setOpen(true);
   };
 
-  // Teachers assigned to selected class and subject
-  const assignedTeachersForForm = useMemo(() => {
-    if (!formClassId) return teachers;
-    const classAssignments = assignments.filter((a) => a.class_id === formClassId);
-    if (!formSubjectId) {
-      const teacherIds = new Set(classAssignments.map((a) => a.teacher_id));
-      return teachers.filter((t) => teacherIds.has(t.id));
-    }
-    const matchingAssignments = classAssignments.filter(
-      (a) => a.subject_id === formSubjectId || a.subject_id === null
-    );
-    const teacherIds = new Set(matchingAssignments.map((a) => a.teacher_id));
-    return teachers.filter((t) => teacherIds.has(t.id));
-  }, [assignments, formClassId, formSubjectId, teachers]);
+  // Teachers assigned to selected subject
+  const availableTeachersForSchedule = useMemo(() => {
+    if (!formSubjectId) return [];
+    const selectedSub = subjects.find((s) => s.id === formSubjectId);
+    return teachers.filter((t) => selectedSub?.teacher_ids?.includes(t.id));
+  }, [formSubjectId, subjects, teachers]);
 
   const handleSubmit = async () => {
     if (formClassId === "" || formSubjectId === "" || !formStartTime || !formEndTime) {
@@ -362,40 +370,27 @@ export default function AdminSchedulesPage() {
     }
   };
 
-  // Day header recurring holiday toggle handler
-  const handleDayHeaderClick = (day: { index: number; name: string }) => {
-    const existingHoliday = getHolidayForDay(day.name);
-    if (existingHoliday) {
-      // Prompt to remove
-      setDeleteHolidayTarget(existingHoliday);
-    } else {
-      // Prompt to mark as recurring holiday
-      setHolidayToggleDay(day);
-      setHolidayReasonInput(`${day.name} Holiday`);
-      setHolidayScopeSchoolWide(false);
+  const handleCreateRecurringHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recurringDay) {
+      toast.error("Please select a day of the week.");
+      return;
     }
-  };
-
-  const handleSaveRecurringHoliday = async () => {
-    if (!holidayToggleDay) return;
-    setSavingHoliday(true);
+    setSubmittingRecurring(true);
     try {
-      const targetClassId = holidayScopeSchoolWide ? null : (selectedClassId ? Number(selectedClassId) : null);
       await api.post("/holidays/", {
         type: "recurring",
-        day: holidayToggleDay.name,
-        class_id: targetClassId,
-        classId: targetClassId,
-        reason: holidayReasonInput.trim() || `${holidayToggleDay.name} Holiday`,
+        day: recurringDay,
+        reason: recurringReason.trim() || `${recurringDay} Holiday`,
       });
-      toast.success(`${holidayToggleDay.name} marked as recurring holiday.`);
-      setHolidayToggleDay(null);
+      toast.success(`Every ${recurringDay} marked as school-wide recurring holiday.`);
+      setRecurringReason("");
       await fetchData();
       if (viewMode === "calendar") await fetchCalendar();
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to set recurring holiday."));
     } finally {
-      setSavingHoliday(false);
+      setSubmittingRecurring(false);
     }
   };
 
@@ -551,13 +546,6 @@ export default function AdminSchedulesPage() {
       {/* Weekly Timetable View */}
       {viewMode === "grid" && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-gray-500 px-1">
-            <span className="flex items-center gap-1.5">
-              <Info className="h-3.5 w-3.5 text-primary-600" />
-              Tip: Click on any day column header to toggle a recurring non-teaching holiday for that day.
-            </span>
-          </div>
-
           <div className="card overflow-x-auto">
             <div className="min-w-[900px]">
               <table className="w-full border-collapse border border-gray-200">
@@ -568,28 +556,24 @@ export default function AdminSchedulesPage() {
                     </th>
                     {DAYS.map((day) => {
                       const hol = getHolidayForDay(day.name);
+                      const dateSubtitle = currentWeekDates[day.index]?.formattedDate;
                       return (
                         <th
                           key={day.index}
-                          onClick={() => handleDayHeaderClick(day)}
-                          className={`border border-gray-200 p-3 text-center text-xs font-bold uppercase cursor-pointer select-none transition-all group ${
+                          className={`border border-gray-200 p-3 text-center text-xs font-bold uppercase select-none transition-all ${
                             hol
-                              ? "bg-amber-100/90 text-amber-900 hover:bg-amber-200/90 border-amber-300"
-                              : "text-gray-700 hover:bg-gray-200/80"
+                              ? "bg-amber-100/90 text-amber-900 border-amber-300"
+                              : "text-gray-700 bg-gray-50/80"
                           }`}
-                          title={hol ? `Holiday: ${hol.reason || 'Non-teaching'}. Click to remove.` : `Click to mark ${day.name} as holiday.`}
                         >
-                          <div className="flex flex-col items-center justify-center gap-1">
-                            <span className="group-hover:underline flex items-center gap-1">
-                              {day.name}
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <span className="font-bold tracking-wider">{day.name}</span>
+                            <span className="text-[11px] font-medium text-gray-500 normal-case tracking-normal">
+                              {dateSubtitle}
                             </span>
-                            {hol ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-200 text-amber-900 border border-amber-300">
+                            {hol && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded text-[10px] font-semibold bg-amber-200 text-amber-900 border border-amber-300 normal-case tracking-normal">
                                 🏖️ {hol.reason || "Holiday"}
-                              </span>
-                            ) : (
-                              <span className="opacity-0 group-hover:opacity-100 text-[10px] text-gray-500 font-normal transition-opacity">
-                                Mark Holiday
                               </span>
                             )}
                           </div>
@@ -732,13 +716,13 @@ export default function AdminSchedulesPage() {
           {activeRecurringHolidays.length > 0 && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex flex-wrap items-center gap-2 text-xs text-amber-900">
               <Palmtree className="h-4 w-4 text-amber-600 shrink-0" />
-              <span className="font-bold">Recurring Holidays:</span>
+              <span className="font-bold">Recurring Holidays (School-wide):</span>
               {activeRecurringHolidays.map((h) => (
                 <span
                   key={h.id}
                   className="bg-amber-200/80 px-2 py-0.5 rounded-full border border-amber-300 font-medium"
                 >
-                  {h.day}: {h.reason || "Holiday"} ({h.class_id ? "Class" : "School-wide"})
+                  {h.day}: {h.reason || "Holiday"}
                 </span>
               ))}
             </div>
@@ -932,66 +916,138 @@ export default function AdminSchedulesPage() {
               </div>
             </div>
 
-            {/* Right Col: Add Specific Holiday Form + Holidays List */}
+            {/* Right Col: Add Holiday Form + Holidays List */}
             <div className="space-y-6">
-              {/* Specific Date Holiday Form */}
+              {/* Add Holiday Form (Specific Date or Recurring Day) */}
               <div className="card">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
-                  <Sparkles className="h-4 w-4 text-primary-600" />
-                  <h3 className="text-sm font-bold text-gray-900">Mark Specific Date as Holiday</h3>
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary-600" />
+                    <h3 className="text-sm font-bold text-gray-900">Add Holiday</h3>
+                  </div>
+                  <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setHolidayFormType("specific")}
+                      className={`px-2.5 py-1 rounded-md transition-all ${
+                        holidayFormType === "specific"
+                          ? "bg-white text-primary-700 shadow-xs"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Specific Date
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHolidayFormType("recurring")}
+                      className={`px-2.5 py-1 rounded-md transition-all ${
+                        holidayFormType === "recurring"
+                          ? "bg-white text-primary-700 shadow-xs"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Recurring Day
+                    </button>
+                  </div>
                 </div>
-                <form onSubmit={handleCreateSpecificHoliday} className="space-y-3">
-                  <div>
-                    <label className="label text-xs">Holiday Date *</label>
-                    <input
-                      type="date"
-                      value={specificDate}
-                      onChange={(e) => setSpecificDate(e.target.value)}
-                      className="input-field text-sm"
-                      required
-                    />
-                  </div>
 
-                  <div>
-                    <label className="label text-xs">Reason / Festival Name *</label>
-                    <input
-                      type="text"
-                      value={specificReason}
-                      onChange={(e) => setSpecificReason(e.target.value)}
-                      placeholder="e.g. Diwali, Independence Day"
-                      className="input-field text-sm"
-                      required
-                    />
-                  </div>
+                {holidayFormType === "specific" ? (
+                  <form onSubmit={handleCreateSpecificHoliday} className="space-y-3">
+                    <div>
+                      <label className="label text-xs">Holiday Date *</label>
+                      <input
+                        type="date"
+                        value={specificDate}
+                        onChange={(e) => setSpecificDate(e.target.value)}
+                        className="input-field text-sm"
+                        required
+                      />
+                    </div>
 
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      type="checkbox"
-                      id="specificSchoolWide"
-                      checked={specificSchoolWide}
-                      onChange={(e) => setSpecificSchoolWide(e.target.checked)}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
-                    />
-                    <label htmlFor="specificSchoolWide" className="text-xs text-gray-700">
-                      Apply School-wide (all classes)
-                    </label>
-                  </div>
+                    <div>
+                      <label className="label text-xs">Reason / Festival Name *</label>
+                      <input
+                        type="text"
+                        value={specificReason}
+                        onChange={(e) => setSpecificReason(e.target.value)}
+                        placeholder="e.g. Diwali, Independence Day"
+                        className="input-field text-sm"
+                        required
+                      />
+                    </div>
 
-                  {!specificSchoolWide && selectedClassId && (
-                    <p className="text-[11px] text-primary-700 bg-primary-50 p-2 rounded border border-primary-200">
-                      Applies only to <strong>{className(selectedClassId)}</strong>
-                    </p>
-                  )}
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="checkbox"
+                        id="specificSchoolWide"
+                        checked={specificSchoolWide}
+                        onChange={(e) => setSpecificSchoolWide(e.target.checked)}
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+                      />
+                      <label htmlFor="specificSchoolWide" className="text-xs text-gray-700">
+                        Apply School-wide (all classes)
+                      </label>
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={submittingSpecific}
-                    className="btn-primary w-full text-xs py-2 flex items-center justify-center gap-1.5"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {submittingSpecific ? "Adding…" : "Add Specific Holiday"}
-                  </button>
-                </form>
+                    {!specificSchoolWide && selectedClassId && (
+                      <p className="text-[11px] text-primary-700 bg-primary-50 p-2 rounded border border-primary-200">
+                        Applies only to <strong>{className(selectedClassId)}</strong>
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={submittingSpecific}
+                      className="btn-primary w-full text-xs py-2 flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {submittingSpecific ? "Adding…" : "Add Specific Holiday"}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleCreateRecurringHoliday} className="space-y-3">
+                    <div>
+                      <label className="label text-xs">Day of Week *</label>
+                      <select
+                        value={recurringDay}
+                        onChange={(e) => setRecurringDay(e.target.value)}
+                        className="input-field text-sm"
+                        required
+                      >
+                        {DAYS.map((d) => (
+                          <option key={d.name} value={d.name}>
+                            Every {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="label text-xs">Reason / Description</label>
+                      <input
+                        type="text"
+                        value={recurringReason}
+                        onChange={(e) => setRecurringReason(e.target.value)}
+                        placeholder="e.g. Weekend Off, Weekly Activity Day"
+                        className="input-field text-sm"
+                      />
+                    </div>
+
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-900 flex items-center gap-1.5">
+                      <Palmtree className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span>Recurring non-teaching days apply <strong>school-wide across all classes</strong>.</span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingRecurring}
+                      className="btn-primary w-full text-xs py-2 flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {submittingRecurring ? "Adding…" : "Add Recurring Holiday"}
+                    </button>
+                  </form>
+                )}
               </div>
 
               {/* Active Holidays List */}
@@ -1046,68 +1102,6 @@ export default function AdminSchedulesPage() {
           </div>
         </div>
       )}
-
-      {/* Modal: Mark Recurring Holiday */}
-      <Modal
-        open={!!holidayToggleDay}
-        title={`Set Recurring Holiday — ${holidayToggleDay?.name}`}
-        onClose={() => setHolidayToggleDay(null)}
-        maxWidth="max-w-md"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Mark all <strong>{holidayToggleDay?.name}s</strong> as non-teaching days.
-          </p>
-
-          <div>
-            <label className="label text-xs">Holiday Reason / Description</label>
-            <input
-              type="text"
-              value={holidayReasonInput}
-              onChange={(e) => setHolidayReasonInput(e.target.value)}
-              placeholder="e.g. Saturday Off, Activity Day"
-              className="input-field text-sm"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="checkbox"
-              id="holidayScopeSchoolWide"
-              checked={holidayScopeSchoolWide}
-              onChange={(e) => setHolidayScopeSchoolWide(e.target.checked)}
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
-            />
-            <label htmlFor="holidayScopeSchoolWide" className="text-xs text-gray-700">
-              Apply to All Classes (School-wide)
-            </label>
-          </div>
-
-          {!holidayScopeSchoolWide && selectedClassId && (
-            <p className="text-xs text-primary-700 bg-primary-50 p-2.5 rounded border border-primary-200">
-              This recurring holiday will apply to <strong>{className(selectedClassId)}</strong> only.
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-            <button
-              onClick={() => setHolidayToggleDay(null)}
-              disabled={savingHoliday}
-              className="btn-secondary text-xs"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveRecurringHoliday}
-              disabled={savingHoliday}
-              className="btn-primary text-xs flex items-center gap-1.5"
-            >
-              <Save className="h-3.5 w-3.5" />
-              {savingHoliday ? "Saving…" : "Save Holiday"}
-            </button>
-          </div>
-        </div>
-      </Modal>
 
       {/* Confirm Remove Holiday Dialog */}
       <ConfirmDialog
@@ -1171,6 +1165,14 @@ export default function AdminSchedulesPage() {
                 onChange={(e) => {
                   const newSubId = e.target.value === "" ? "" : Number(e.target.value);
                   setFormSubjectId(newSubId);
+                  if (!newSubId) {
+                    setFormTeacherId("");
+                  } else if (formTeacherId !== "") {
+                    const newSub = subjects.find((s) => s.id === newSubId);
+                    if (!newSub?.teacher_ids?.includes(Number(formTeacherId))) {
+                      setFormTeacherId("");
+                    }
+                  }
                 }}
                 className="input-field"
               >
@@ -1187,27 +1189,23 @@ export default function AdminSchedulesPage() {
               <select
                 value={formTeacherId}
                 onChange={(e) => setFormTeacherId(e.target.value === "" ? "" : Number(e.target.value))}
-                className="input-field"
+                className="input-field disabled:bg-gray-100 disabled:text-gray-400"
+                disabled={!formSubjectId}
               >
-                <option value="">Select teacher (optional)</option>
-                {assignedTeachersForForm.length > 0 && (
-                  <optgroup label="Assigned to this class/subject">
-                    {assignedTeachersForForm.map((t) => (
+                {!formSubjectId ? (
+                  <option value="">Select a subject first</option>
+                ) : availableTeachersForSchedule.length === 0 ? (
+                  <option value="">No teachers assigned to this subject</option>
+                ) : (
+                  <>
+                    <option value="">Select teacher (optional)</option>
+                    {availableTeachersForSchedule.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.full_name || `#${t.id}`}
                       </option>
                     ))}
-                  </optgroup>
+                  </>
                 )}
-                <optgroup label="All Teachers">
-                  {teachers
-                    .filter((t) => !assignedTeachersForForm.some((at) => at.id === t.id))
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.full_name || `#${t.id}`}
-                      </option>
-                    ))}
-                </optgroup>
               </select>
             </div>
           </div>

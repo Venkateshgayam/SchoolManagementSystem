@@ -1,5 +1,5 @@
 import datetime as dt
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, Literal, Union
 
 
@@ -11,6 +11,12 @@ class HolidayCreate(BaseModel):
     date: Optional[dt.date] = None
     class_id: Optional[int] = Field(None, alias="classId")
     reason: Optional[str] = Field(None, max_length=255)
+
+    @model_validator(mode="after")
+    def validate_holiday_scope(self):
+        if self.type == "recurring":
+            self.class_id = None
+        return self
 
     @field_validator("day", mode="before")
     @classmethod

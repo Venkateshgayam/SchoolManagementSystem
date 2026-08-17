@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ClipboardList, Calendar, Save, History, Users, Filter, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { ClipboardList, Calendar, Save, History, Users } from "lucide-react";
 import { formatStudentNameId, formatDate } from "@/lib/formatters";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
-import { can } from "@/lib/permissions";
 import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
+import AttendanceRecordsList from "@/components/dashboard/AttendanceRecordsList";
 
 interface AttendanceRecord {
   id: number;
@@ -46,13 +46,14 @@ export default function AdminAttendancePage() {
 
   // Month filter for review (YYYY-MM)
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    return new Date().toLocaleDateString('en-CA').slice(0, 7);
+    return new Date().toLocaleDateString("en-CA").slice(0, 7);
   });
+  const [historyDateFilter, setHistoryDateFilter] = useState<string>("");
   const [historyClassFilter, setHistoryClassFilter] = useState<string>("all");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<string>("all");
 
   useEffect(() => {
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = new Date().toLocaleDateString("en-CA");
     setSelectedDate(today);
   }, []);
 
@@ -80,7 +81,7 @@ export default function AdminAttendancePage() {
   const classOptions = classes;
 
   const filteredStudents = useMemo(
-    () => selectedClassId ? students.filter((s) => s.class_id === selectedClassId) : [],
+    () => (selectedClassId ? students.filter((s) => s.class_id === selectedClassId) : []),
     [students, selectedClassId]
   );
 
@@ -124,16 +125,32 @@ export default function AdminAttendancePage() {
       : attendance.filter((a) => a.date.startsWith(selectedMonth));
   }, [attendance, selectedMonth]);
 
-  const { total: monthTotal, present: monthPresent, absent: monthAbsent, late: monthLate, rate: monthRate } = calculateAttendanceStats(monthAttendance);
+  const {
+    total: monthTotal,
+    present: monthPresent,
+    absent: monthAbsent,
+    late: monthLate,
+    rate: monthRate,
+  } = calculateAttendanceStats(monthAttendance);
 
   // History table filtered records
   const historyFilteredRecords = useMemo(() => {
-    return monthAttendance.filter((a) => {
-      if (historyClassFilter !== "all" && a.class_id !== Number(historyClassFilter)) return false;
-      if (historyStatusFilter !== "all" && a.status.toLowerCase() !== historyStatusFilter.toLowerCase()) return false;
-      return true;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [monthAttendance, historyClassFilter, historyStatusFilter]);
+    const sourceRecords = historyDateFilter
+      ? attendance.filter((a) => a.date === historyDateFilter)
+      : monthAttendance;
+
+    return sourceRecords
+      .filter((a) => {
+        if (historyClassFilter !== "all" && a.class_id !== Number(historyClassFilter)) return false;
+        if (
+          historyStatusFilter !== "all" &&
+          a.status.toLowerCase() !== historyStatusFilter.toLowerCase()
+        )
+          return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [attendance, monthAttendance, historyDateFilter, historyClassFilter, historyStatusFilter]);
 
   const handleSave = async () => {
     if (!selectedClassId) {
@@ -163,7 +180,10 @@ export default function AdminAttendancePage() {
     try {
       for (const entry of entries) {
         const existing = attendance.find(
-          (record) => record.student_id === entry.student_id && record.class_id === entry.class_id && record.date === entry.date
+          (record) =>
+            record.student_id === entry.student_id &&
+            record.class_id === entry.class_id &&
+            record.date === entry.date
         );
         if (existing) {
           await api.put(`/attendance/${existing.id}`, {
@@ -190,15 +210,30 @@ export default function AdminAttendancePage() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center py-12"><div className="text-gray-500">Loading attendance…</div></div>;
-  if (error) return (<div className="card max-w-lg mx-auto text-center py-8"><p className="text-gray-600 mb-4">{error}</p><button onClick={() => window.location.reload()} className="btn-primary">Retry</button></div>);
+  if (loading)
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-500">Loading attendance…</div>
+      </div>
+    );
+  if (error)
+    return (
+      <div className="card max-w-lg mx-auto text-center py-8">
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button onClick={() => window.location.reload()} className="btn-primary">
+          Retry
+        </button>
+      </div>
+    );
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
-          <p className="text-sm text-gray-500 mt-1">Mark daily attendance and review historical monthly records</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Mark daily attendance and review historical monthly records
+          </p>
         </div>
 
         {/* Month Selector Filter */}
@@ -212,7 +247,13 @@ export default function AdminAttendancePage() {
           />
           <button
             type="button"
-            onClick={() => setSelectedMonth(selectedMonth === "all" ? new Date().toLocaleDateString('en-CA').slice(0, 7) : "all")}
+            onClick={() =>
+              setSelectedMonth(
+                selectedMonth === "all"
+                  ? new Date().toLocaleDateString("en-CA").slice(0, 7)
+                  : "all"
+              )
+            }
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
               selectedMonth === "all"
                 ? "bg-primary-600 text-white"
@@ -227,24 +268,32 @@ export default function AdminAttendancePage() {
       {/* Monthly Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="card text-center">
-          <p className="text-xs font-medium text-gray-500 uppercase">{getMonthLabel(selectedMonth)} Rate</p>
+          <p className="text-xs font-medium text-gray-500 uppercase">
+            {getMonthLabel(selectedMonth)} Rate
+          </p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{monthRate.toFixed(1)}%</p>
           <p className="text-xs text-gray-400 mt-0.5">{monthTotal} total mark(s)</p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-gray-500 uppercase">Present</p>
           <p className="mt-2 text-2xl font-bold text-green-600">{monthPresent}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthPresent / monthTotal) * 100)}%` : "0%"}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {monthTotal > 0 ? `${Math.round((monthPresent / monthTotal) * 100)}%` : "0%"}
+          </p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-gray-500 uppercase">Absent</p>
           <p className="mt-2 text-2xl font-bold text-red-600">{monthAbsent}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthAbsent / monthTotal) * 100)}%` : "0%"}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {monthTotal > 0 ? `${Math.round((monthAbsent / monthTotal) * 100)}%` : "0%"}
+          </p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-gray-500 uppercase">Late</p>
           <p className="mt-2 text-2xl font-bold text-yellow-600">{monthLate}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{monthTotal > 0 ? `${Math.round((monthLate / monthTotal) * 100)}%` : "0%"}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {monthTotal > 0 ? `${Math.round((monthLate / monthTotal) * 100)}%` : "0%"}
+          </p>
         </div>
       </div>
 
@@ -296,7 +345,9 @@ export default function AdminAttendancePage() {
         {selectedClassId === null ? (
           <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
             <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">Select a class above to mark or modify attendance.</p>
+            <p className="text-gray-500 text-sm">
+              Select a class above to mark or modify attendance.
+            </p>
           </div>
         ) : filteredStudents.length === 0 ? (
           <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
@@ -308,18 +359,35 @@ export default function AdminAttendancePage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status ({selectedDate})</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Student
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Roll No.
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Status ({selectedDate})
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredStudents.map((student) => {
-                    const currentStatus = statusMap[student.id] ?? existingRecords.find((record) => record.student_id === student.id)?.status ?? "";
+                    const currentStatus =
+                      statusMap[student.id] ??
+                      existingRecords.find((record) => record.student_id === student.id)?.status ??
+                      "";
                     return (
                       <tr key={student.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatStudentNameId(student.full_name, student.id, student.roll_number)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.roll_number || "—"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {formatStudentNameId(
+                            student.full_name,
+                            student.id,
+                            student.roll_number
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {student.roll_number || "—"}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <select
                             className="input w-40"
@@ -328,7 +396,9 @@ export default function AdminAttendancePage() {
                           >
                             <option value="">Select status</option>
                             {STATUS_OPTIONS.map((status) => (
-                              <option key={status} value={status}>{status}</option>
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
                             ))}
                           </select>
                         </td>
@@ -338,7 +408,11 @@ export default function AdminAttendancePage() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-4 text-xs text-gray-500">Updating attendance for <span className="font-semibold">{filteredStudents.length}</span> student(s) on <span className="font-semibold">{selectedDate}</span>.</p>
+            <p className="mt-4 text-xs text-gray-500">
+              Updating attendance for{" "}
+              <span className="font-semibold">{filteredStudents.length}</span> student(s) on{" "}
+              <span className="font-semibold">{selectedDate}</span>.
+            </p>
           </div>
         )}
       </div>
@@ -351,14 +425,45 @@ export default function AdminAttendancePage() {
               <History className="h-5 w-5 text-primary-600" />
               Attendance Records Review ({getMonthLabel(selectedMonth)})
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">Filter past records by class and status for the selected month</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Filter past records by date, class, and status for the selected month
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Specific Date Filter */}
+            <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded px-2.5 py-1 shadow-2xs">
+              <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <input
+                type="date"
+                value={historyDateFilter}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setHistoryDateFilter(val);
+                  if (val && selectedMonth !== "all" && !val.startsWith(selectedMonth)) {
+                    setSelectedMonth(val.slice(0, 7));
+                  }
+                }}
+                className="text-xs focus:outline-none bg-transparent text-gray-800"
+                placeholder="Filter by date"
+                title="Filter by specific date"
+              />
+              {historyDateFilter && (
+                <button
+                  type="button"
+                  onClick={() => setHistoryDateFilter("")}
+                  className="text-gray-400 hover:text-gray-600 text-xs px-1 font-bold"
+                  title="Clear date filter"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
             <select
               value={historyClassFilter}
               onChange={(e) => setHistoryClassFilter(e.target.value)}
-              className="text-xs border border-gray-300 rounded px-2.5 py-1.5 bg-white"
+              className="text-xs border border-gray-300 rounded px-2.5 py-1.5 bg-white shadow-2xs"
             >
               <option value="all">All Classes</option>
               {classes.map((cls) => (
@@ -371,7 +476,7 @@ export default function AdminAttendancePage() {
             <select
               value={historyStatusFilter}
               onChange={(e) => setHistoryStatusFilter(e.target.value)}
-              className="text-xs border border-gray-300 rounded px-2.5 py-1.5 bg-white capitalize"
+              className="text-xs border border-gray-300 rounded px-2.5 py-1.5 bg-white capitalize shadow-2xs"
             >
               <option value="all">All Statuses</option>
               <option value="present">Present</option>
@@ -381,61 +486,18 @@ export default function AdminAttendancePage() {
           </div>
         </div>
 
-        {historyFilteredRecords.length === 0 ? (
-          <div className="text-center py-8">
-            <ClipboardList className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">No attendance records found for {getMonthLabel(selectedMonth)} with selected filters.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {historyFilteredRecords.slice(0, 100).map((record) => {
-                  const s = students.find((st) => st.id === record.student_id);
-                  return (
-                    <tr key={record.id}>
-                      <td className="px-6 py-3.5 whitespace-nowrap text-sm text-gray-900">{formatDate(record.date)}</td>
-                      <td className="px-6 py-3.5 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatStudentNameId(s?.full_name, record.student_id, s?.roll_number)}
-                      </td>
-                      <td className="px-6 py-3.5 whitespace-nowrap text-sm text-gray-600">
-                        {getClassName(record.class_id)}
-                      </td>
-                      <td className="px-6 py-3.5 whitespace-nowrap text-sm">
-                        <span
-                          className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${
-                            record.status === "present"
-                              ? "bg-green-100 text-green-800"
-                              : record.status === "absent"
-                              ? "bg-red-100 text-red-800"
-                              : record.status === "late"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {record.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {historyFilteredRecords.length > 100 && (
-              <p className="text-xs text-gray-400 text-center py-2">
-                Showing first 100 of {historyFilteredRecords.length} records.
-              </p>
-            )}
-          </div>
-        )}
+        <AttendanceRecordsList
+          records={historyFilteredRecords}
+          students={students}
+          classes={classes}
+          showStudentInfo={true}
+          showClassInfo={true}
+          emptyMessage={
+            historyDateFilter
+              ? `No attendance records found for ${formatDate(historyDateFilter)} with selected filters.`
+              : `No attendance records found for ${getMonthLabel(selectedMonth)} with selected filters.`
+          }
+        />
       </div>
     </div>
   );

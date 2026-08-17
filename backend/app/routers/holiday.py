@@ -23,12 +23,19 @@ async def list_holidays(
 ):
     """
     List holidays.
-    If class_id/classId is provided, returns school-wide (class_id is NULL) + class-specific holidays.
+    Recurring holidays are always returned (school-wide).
+    If class_id/classId is provided, returns school-wide + class-specific specific holidays.
     If class_id is omitted, returns all holidays.
     """
     query = select(Holiday)
     if class_id is not None:
-        query = query.where(or_(Holiday.class_id.is_(None), Holiday.class_id == class_id))
+        query = query.where(
+            or_(
+                Holiday.type == "recurring",
+                Holiday.class_id.is_(None),
+                Holiday.class_id == class_id,
+            )
+        )
     
     query = query.order_by(Holiday.id.desc())
     result = await db.execute(query)
@@ -46,11 +53,18 @@ async def get_holiday_calendar(
     """
     Projects recurring weekday holidays onto real calendar dates for the specified month/year,
     merges in specific-date holidays for that month, and returns sorted entries.
+    Recurring holidays are always school-wide.
     """
-    # 1. Fetch relevant holidays (school-wide + class-specific if class_id provided)
+    # 1. Fetch relevant holidays (all recurring + school-wide & class-specific specific-date holidays)
     query = select(Holiday)
     if class_id is not None:
-        query = query.where(or_(Holiday.class_id.is_(None), Holiday.class_id == class_id))
+        query = query.where(
+            or_(
+                Holiday.type == "recurring",
+                Holiday.class_id.is_(None),
+                Holiday.class_id == class_id,
+            )
+        )
     
     result = await db.execute(query)
     all_holidays = result.scalars().all()
@@ -59,10 +73,7 @@ async def get_holiday_calendar(
     recurring_by_day = {}
     for h in all_holidays:
         if h.type == "recurring" and h.day:
-            day_cap = h.day.capitalize()
-            # If both school-wide and class-specific exist, class-specific can override or take precedence
-            if day_cap not in recurring_by_day or h.class_id is not None:
-                recurring_by_day[day_cap] = h
+            recurring_by_day[h.day.capitalize()] = h
 
     specific_by_date = {}
     for h in all_holidays:
@@ -99,7 +110,7 @@ async def get_holiday_calendar(
                     day=day_name,
                     reason=h.reason or f"{day_name} Holiday",
                     type="recurring",
-                    class_id=h.class_id,
+                    class_id=None,
                 )
             )
 
@@ -115,6 +126,7 @@ async def create_holiday(
 ):
     """
     Create a new holiday (recurring or specific). Admin-only.
+    Recurring holidays are always school-wide (class_id is always None).
     Enforces validation and prevents duplicate entries.
     """
     data = request.model_dump(exclude_unset=True)
@@ -137,19 +149,18 @@ async def create_holiday(
             )
         data["day"] = day_formatted
         data["date"] = None
+        data["class_id"] = None
 
-        # Check duplicate
+        # Check duplicate (recurring holidays are strictly school-wide and unique per day)
         dup_query = select(Holiday).where(
             Holiday.type == "recurring",
             Holiday.day == day_formatted,
-            Holiday.class_id.is_(None) if h_class_id is None else Holiday.class_id == h_class_id,
         )
         existing = (await db.execute(dup_query)).scalar_one_or_none()
         if existing:
-            scope = f"for class #{h_class_id}" if h_class_id else "school-wide"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A recurring holiday for {day_formatted} already exists ({scope}).",
+                detail=f"A recurring holiday for {day_formatted} already exists (school-wide).",
             )
 
     elif h_type == "specific":

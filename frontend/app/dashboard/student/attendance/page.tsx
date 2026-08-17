@@ -1,11 +1,12 @@
 "use client";
 import { formatDate } from "@/lib/formatters";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ClipboardList, Calendar, TrendingUp, Filter } from "lucide-react";
 import api from "@/lib/api";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
+import AttendanceRecordsList from "@/components/dashboard/AttendanceRecordsList";
 
 interface AttendanceRecord {
   id: number;
@@ -31,6 +32,7 @@ export default function StudentAttendancePage() {
   const [selectedMonth, setSelectedMonth] = useState(() => {
     return new Date().toLocaleDateString('en-CA').slice(0, 7);
   });
+  const [historyDateFilter, setHistoryDateFilter] = useState<string>("");
 
   useEffect(() => {
     async function fetchAttendance() {
@@ -63,6 +65,14 @@ export default function StudentAttendancePage() {
   const filteredAttendance = selectedMonth === "all"
     ? attendance
     : attendance.filter((r) => r.date.startsWith(selectedMonth));
+
+  // Date-filtered records for review
+  const historyFilteredRecords = useMemo(() => {
+    if (historyDateFilter) {
+      return attendance.filter((r) => r.date === historyDateFilter);
+    }
+    return filteredAttendance;
+  }, [attendance, filteredAttendance, historyDateFilter]);
 
   const { total, present, absent, late, rate: attendancePercent } = calculateAttendanceStats(filteredAttendance);
   const formattedPercent = Math.round(attendancePercent);
@@ -165,58 +175,61 @@ export default function StudentAttendancePage() {
       )}
 
       <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Attendance Records ({getMonthLabel(selectedMonth)})
-          </h2>
-          <span className="text-xs text-gray-500 font-medium">
-            {filteredAttendance.length} record(s)
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Attendance Records ({getMonthLabel(selectedMonth)})
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">Filter your attendance history by date</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Specific Date Filter */}
+            <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded px-2.5 py-1 shadow-2xs">
+              <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <input
+                type="date"
+                value={historyDateFilter}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setHistoryDateFilter(val);
+                  if (val && selectedMonth !== "all" && !val.startsWith(selectedMonth)) {
+                    setSelectedMonth(val.slice(0, 7));
+                  }
+                }}
+                className="text-xs focus:outline-none bg-transparent text-gray-800"
+                placeholder="Filter by date"
+                title="Filter by specific date"
+              />
+              {historyDateFilter && (
+                <button
+                  type="button"
+                  onClick={() => setHistoryDateFilter("")}
+                  className="text-gray-400 hover:text-gray-600 text-xs px-1 font-bold"
+                  title="Clear date filter"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+              {historyFilteredRecords.length} record(s)
+            </span>
+          </div>
         </div>
 
-        {filteredAttendance.length === 0 ? (
-          <div className="text-center py-8">
-            <ClipboardList className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-600">No attendance records found for {getMonthLabel(selectedMonth)}.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAttendance
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((record) => (
-                    <tr key={record.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(record.date)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${
-                            record.status === "present"
-                              ? "bg-green-100 text-green-800"
-                              : record.status === "absent"
-                              ? "bg-red-100 text-red-800"
-                              : record.status === "late"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {record.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <AttendanceRecordsList
+          records={historyFilteredRecords}
+          classes={classInfo ? [classInfo] : []}
+          showStudentInfo={false}
+          showClassInfo={true}
+          emptyMessage={
+            historyDateFilter
+              ? `No attendance records found for ${formatDate(historyDateFilter)}.`
+              : `No attendance records found for ${getMonthLabel(selectedMonth)}.`
+          }
+        />
       </div>
     </div>
   );

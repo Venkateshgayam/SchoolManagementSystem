@@ -20,7 +20,7 @@ class Holiday(Base):
     creator = relationship("User")
 
     __table_args__ = (
-        Index("idx_holiday_recurring_unique", "class_id", "day", unique=True, postgresql_where=(type == "recurring")),
+        Index("idx_holiday_recurring_unique", "day", unique=True, postgresql_where=(type == "recurring")),
         Index("idx_holiday_specific_unique", "class_id", "date", unique=True, postgresql_where=(type == "specific")),
     )
 

@@ -11,6 +11,7 @@ import Link from "next/link";
 import { formatStudentNameId, formatTeacherNameId } from "@/lib/formatters";
 import OverallResult, { OverallResultData } from "@/components/dashboard/OverallResult";
 import { calculateAttendanceStats } from "@/lib/attendanceCalculations";
+import AttendanceRecordsList from "@/components/dashboard/AttendanceRecordsList";
 
 interface StudentProfile {
   id: number;
@@ -307,36 +308,13 @@ export default function StudentProfilePage() {
               </div>
             </div>
 
-            {filteredStudentAttendance.length === 0 ? (
-              <p className="text-gray-600 text-sm">No attendance records found for this period.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredStudentAttendance.slice(0, 31).map(a => (
-                      <tr key={a.id}>
-                        <td className="px-4 py-3 text-sm text-gray-900">{formatDate(a.date)}</td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            a.status === 'present' ? 'bg-green-100 text-green-800' :
-                            a.status === 'absent' ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {a.status.toUpperCase()}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <AttendanceRecordsList
+              records={filteredStudentAttendance}
+              classes={classInfo ? [classInfo] : []}
+              showStudentInfo={false}
+              showClassInfo={true}
+              emptyMessage="No attendance records found for this period."
+            />
           </div>
         </div>
       </div>

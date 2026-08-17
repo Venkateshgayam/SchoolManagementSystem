@@ -432,10 +432,21 @@ export default function AdminAssignmentsPage() {
               <label className="block text-sm font-medium text-gray-600 mb-1">Subject</label>
               <select
                 value={formSubjectId}
-                onChange={(e) => setFormSubjectId(e.target.value ? Number(e.target.value) : "")}
+                onChange={(e) => {
+                  const newSubId = e.target.value ? Number(e.target.value) : "";
+                  setFormSubjectId(newSubId);
+                  if (!newSubId) {
+                    setFormTeacherId("");
+                  } else if (formTeacherId !== "") {
+                    const newSub = subjects.find((s) => s.id === newSubId);
+                    if (!newSub?.teacher_ids?.includes(Number(formTeacherId))) {
+                      setFormTeacherId("");
+                    }
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                <option value="">No subject</option>
+                <option value="">Select subject</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>{s.code ? `${s.code} - ${s.name}` : s.name}</option>
                 ))}
@@ -480,15 +491,28 @@ export default function AdminAssignmentsPage() {
               <select
                 value={formTeacherId}
                 onChange={(e) => setFormTeacherId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400"
+                disabled={!formSubjectId}
               >
-                <option value="">No teacher</option>
-                {(formSubjectId 
-                  ? teachers.filter(t => subjects.find(s => s.id === formSubjectId)?.teacher_ids?.includes(t.id)) 
-                  : teachers
-                ).map((t) => (
-                  <option key={t.id} value={t.id}>{formatTeacherNameId(t.full_name, t.id)}</option>
-                ))}
+                {!formSubjectId ? (
+                  <option value="">Select a subject first</option>
+                ) : (
+                  (() => {
+                    const selectedSub = subjects.find((s) => s.id === formSubjectId);
+                    const validTeachers = teachers.filter((t) => selectedSub?.teacher_ids?.includes(t.id));
+                    if (validTeachers.length === 0) {
+                      return <option value="">No teachers assigned to this subject</option>;
+                    }
+                    return (
+                      <>
+                        <option value="">Select teacher (optional)</option>
+                        {validTeachers.map((t) => (
+                          <option key={t.id} value={t.id}>{formatTeacherNameId(t.full_name, t.id)}</option>
+                        ))}
+                      </>
+                    );
+                  })()
+                )}
               </select>
             </div>
           </div>
